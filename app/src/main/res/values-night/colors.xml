@@ -1,1 +1,1 @@
-<resources><color name="ink">#F4EFF7</color><color name="paper">#211F24</color><color name="accent">#D0BCFF</color><color name="icon_background">#211F24</color></resources>
+<resources><color name="ink">#F4EFF7</color><color name="paper">#211F24</color><color name="accent">#D0BCFF</color><color name="icon_background">#211F24</color><color name="icon_foreground_tint">#D0BCFF</color></resources>
