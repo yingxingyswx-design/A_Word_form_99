@@ -34,9 +34,11 @@ final class WidgetPinHelper {
     private static final long VERIFY_DELAY_MS = 2500L;
 
     private final Activity activity;
+    private final String appName;
 
     WidgetPinHelper(Activity activity) {
         this.activity = activity;
+        this.appName = activity.getString(R.string.app_name);
     }
 
     void add() {
@@ -109,7 +111,7 @@ final class WidgetPinHelper {
             return;
         }
         if (isOppo() && openWidgetPanel()) {
-            toast("已打开小组件面板，请选择 DailyLine 拖到桌面");
+            toast("已打开小组件面板，请选择 " + appName + " 拖到桌面");
             return;
         }
         showGuide(true);
@@ -133,19 +135,20 @@ final class WidgetPinHelper {
         StringBuilder sb = new StringBuilder();
         if (isXiaomi()) {
             sb.append("HyperOS / MIUI 的「添加小组件」需要「桌面快捷方式」权限，未授权时不会报错，只会在桌面上悄悄失败。\n\n")
-              .append("1. 点「桌面快捷方式权限」，允许 DailyLine 创建桌面快捷方式；\n")
+              .append("1. 点「桌面快捷方式权限」，允许 ").append(appName).append(" 创建桌面快捷方式；\n")
               .append("2. 回到这里重新点「将小组件添加到桌面」。\n\n")
-              .append("也可以手动添加：长按桌面空白处 → 添加小部件 → 找到 DailyLine → 拖到桌面。");
+              .append("也可以手动添加：长按桌面空白处 → 添加小部件 → 找到 ").append(appName).append(" → 拖到桌面。");
         } else if (isVivo()) {
             sb.append("OriginOS 不允许普通应用直接往桌面添加组件（官方接口对该品牌无效，需接入 vivo 原子组件 SDK 并上架审核）。\n\n")
-              .append("手动添加：长按桌面空白处 → 「原子组件」→ 切到「安卓组件」页 → 找到 DailyLine → 拖到桌面。");
+              .append("手动添加：长按桌面空白处 → 「原子组件」→ 切到「安卓组件」页 → 找到 ").append(appName).append(" → 拖到桌面。");
         } else if (isHuawei()) {
             sb.append("HarmonyOS / EMUI 会弹出添加确认框。若提示「当前页面空间不足」，请先往右滑新建一页桌面，再点一次添加。\n\n")
-              .append("也可以手动添加：长按桌面空白处 → 「窗口小工具」→ 找到 DailyLine → 拖到桌面。");
+              .append("也可以手动添加：长按桌面空白处 → 「窗口小工具」→ 找到 ").append(appName).append(" → 拖到桌面。");
         } else if (isOppo()) {
-            sb.append("ColorOS 正常会弹出添加确认框。若没有反应，请用下方「打开小组件面板」，或长按桌面空白处 → 「小部件」→ 找到 DailyLine。");
+            sb.append("ColorOS 正常会弹出添加确认框。若没有反应，请用下方「打开小组件面板」，或长按桌面空白处 → 「小部件」→ 找到 ")
+              .append(appName).append("。");
         } else {
-            sb.append("请回到桌面，长按空白处 → 选择「小组件 / 小部件」→ 找到 DailyLine → 拖到桌面。");
+            sb.append("请回到桌面，长按空白处 → 选择「小组件 / 小部件」→ 找到 ").append(appName).append(" → 拖到桌面。");
         }
         sb.append("\n\n当前桌面：").append(launcherPackage());
         sb.append("（").append(Build.MANUFACTURER).append(" ").append(Build.VERSION.RELEASE).append("）");
@@ -204,7 +207,7 @@ final class WidgetPinHelper {
             activity.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     Uri.parse("package:" + activity.getPackageName())));
         } catch (Exception e) {
-            toast("请到系统设置中为 DailyLine 开启桌面快捷方式权限");
+            toast("请到系统设置中为 " + appName + " 开启桌面快捷方式权限");
         }
     }
 
