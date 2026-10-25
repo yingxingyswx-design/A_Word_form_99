@@ -15,6 +15,19 @@
 
 本次生成环境只有 Java，没有 Gradle/Android SDK，因此本次没有声称已经生成 APK；项目文件已完整写入，尚未经过本机编译验证。
 
+## 在桌面添加小组件
+
+应用内「将小组件添加到桌面」走 `AppWidgetManager.requestPinAppWidget()`，并用 `getAppWidgetIds()` 的数量变化校验是否真的添加成功（该 API 在失败时同样返回 `true`）。失败后按品牌兜底：
+
+| 系统 | 实测行为 | 处理 |
+| --- | --- | --- |
+| AOSP / 三星 / ColorOS | 弹确认框，确认后添加 | 官方接口 |
+| HyperOS / MIUI | 不弹框直接加；缺「桌面快捷方式」权限时静默失败 | 引导开启权限（直达权限编辑器） |
+| HarmonyOS / EMUI | 弹确认框，但永不回调 PendingIntent | 数量校验 + 新建一页提示 |
+| OriginOS / iQOO | 官方接口无效（需接入原子组件 SDK 并上架） | 直接给手动添加指引 |
+
+`WidgetPinHelper.java` 负责这套兼容逻辑；ColorOS 的 `ToggleBar_widget` 面板入口仅作为兜底，且必须先 `resolveActivity` 确认存在。
+
 ## 资料与准确性
 
 `QuoteLibrary.java` 中 `原文` 是短句或常见英文译文，仍建议发布前按所选中文版本逐条校对页码；`译写 / 意译` 明确是思想转述。像“你必须成为你希望在世界中看到的改变”这类广泛流传但出处存在争议的句子已标为意译/争议性来源，避免当作可靠逐字引文。

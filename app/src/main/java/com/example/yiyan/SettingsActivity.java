@@ -1,10 +1,157 @@
 package com.example.yiyan;
-import android.app.*;import android.appwidget.*;import android.os.*;import android.content.*;import android.view.*;import android.widget.*;import java.util.*;import com.google.android.material.bottomnavigation.BottomNavigationView;
-public class SettingsActivity extends Activity{
- private static final int PICK_WIDGET=4101; private int pendingWidgetId=-1; private AppWidgetHost widgetHost;
- private void addWidget(){AppWidgetManager m=AppWidgetManager.getInstance(this);ComponentName p=new ComponentName(this,QuoteWidgetProvider.class);String launcher=defaultLauncher();try{if(launcher.contains("vivo")||launcher.contains("bbk")||launcher.contains("huawei")){showOemGuide();return;}if(Build.VERSION.SDK_INT>=26&&m.isRequestPinAppWidgetSupported()){PendingIntent cb=PendingIntent.getBroadcast(this,4103,new Intent(this,QuoteWidgetProvider.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);if(m.requestPinAppWidget(p,null,cb)){Toast.makeText(this,"已向桌面发送请求，请确认添加",Toast.LENGTH_LONG).show();return;}}String brand=Build.MANUFACTURER.toLowerCase(Locale.ROOT);if(brand.contains("oppo")||brand.contains("realme")||launcher.contains("com.android.launcher")){Intent colorOs=new Intent();colorOs.setComponent(new ComponentName("com.android.launcher","com.android.launcher.Launcher"));colorOs.putExtra("state","ToggleBar_widget");if(getPackageManager().resolveActivity(colorOs,0)!=null){startActivity(colorOs);Toast.makeText(this,"已打开 ColorOS 小组件面板，请选择 DailyLine",Toast.LENGTH_LONG).show();return;}}if(widgetHost==null)widgetHost=new AppWidgetHost(this,4102);pendingWidgetId=widgetHost.allocateAppWidgetId();Intent pick=new Intent(AppWidgetManager.ACTION_APPWIDGET_PICK);pick.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,pendingWidgetId);startActivityForResult(pick,PICK_WIDGET);}catch(Exception e){if(pendingWidgetId!=-1&&widgetHost!=null)widgetHost.deleteAppWidgetId(pendingWidgetId);pendingWidgetId=-1;showOemGuide();android.util.Log.w("99YIYAN_LOG","添加小组件失败",e);}}
- private String defaultLauncher(){try{Intent i=new Intent(Intent.ACTION_MAIN);i.addCategory(Intent.CATEGORY_HOME);android.content.pm.ResolveInfo r=getPackageManager().resolveActivity(i,android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);return r!=null&&r.activityInfo!=null?r.activityInfo.packageName.toLowerCase(Locale.ROOT):"";}catch(Exception e){return "";}}
- private void showOemGuide(){String brand=Build.MANUFACTURER.toLowerCase(Locale.ROOT);String msg=brand.contains("xiaomi")||brand.contains("redmi")?"HyperOS：回到桌面，长按空白处，选择“小组件”，在 Android 小组件中找到 DailyLine。若列表为空，请更新系统桌面或小米个人助理。":brand.contains("vivo")?"OriginOS：回到桌面，长按空白处，选择“原子组件/小组件”，找到 DailyLine 后拖到桌面。":"当前桌面未接受应用内添加，请回到桌面长按空白处，在小组件列表中找到 DailyLine。";new AlertDialog.Builder(this).setTitle("添加小组件").setMessage(msg).setPositiveButton("回到桌面",(d,w)->{Intent home=new Intent(Intent.ACTION_MAIN);home.addCategory(Intent.CATEGORY_HOME);home.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(home);}).setNegativeButton("知道了",null).show();}
- protected void onActivityResult(int requestCode,int resultCode,Intent data){super.onActivityResult(requestCode,resultCode,data);if(requestCode==PICK_WIDGET&&resultCode!=RESULT_OK&&pendingWidgetId!=-1&&widgetHost!=null){widgetHost.deleteAppWidgetId(pendingWidgetId);pendingWidgetId=-1;}}
- public void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_settings);final android.content.SharedPreferences p=getSharedPreferences("settings",0);findViewById(R.id.manage_quotes).setOnClickListener(v->startActivity(new Intent(this,ManageQuotesActivity.class)));findViewById(R.id.add_widget).setOnClickListener(v->addWidget());Spinner mode=findViewById(R.id.order_mode);mode.setAdapter(ArrayAdapter.createFromResource(this,R.array.order_modes,android.R.layout.simple_spinner_dropdown_item));mode.setSelection(p.getBoolean("randomMode",true)?0:1);mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> a,View v,int pos,long id){p.edit().putBoolean("randomMode",pos==0).apply();}public void onNothingSelected(AdapterView<?> a){}});Spinner category=findViewById(R.id.custom_category);ArrayList<String> cats=new ArrayList<>();cats.add("用户");cats.add("哲学");for(String s:p.getStringSet("categories",new HashSet<String>()))if(!cats.contains(s))cats.add(s);category.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,cats));Switch sw=findViewById(R.id.show_paraphrase);sw.setChecked(p.getBoolean("paraphrase",true));sw.setOnCheckedChangeListener((v,c)->p.edit().putBoolean("paraphrase",c).apply());SeekBar size=findViewById(R.id.font_size);size.setProgress(p.getInt("fontSize",16)-12);size.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar b,int v,boolean f){p.edit().putInt("fontSize",v+12).apply();}public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}});CheckBox monet=findViewById(R.id.monet);monet.setChecked(p.getBoolean("monet",false));monet.setOnCheckedChangeListener((v,c)->p.edit().putBoolean("monet",c).apply());ColorPickerView picker=findViewById(R.id.color_picker);picker.setOnColorChangedListener(c->p.edit().putInt("themeColor",c).apply());findViewById(R.id.add_quote).setOnClickListener(v->{EditText t=findViewById(R.id.custom_text),a=findViewById(R.id.custom_author),w=findViewById(R.id.custom_work);String text=t.getText().toString().trim(),author=a.getText().toString().trim(),work=w.getText().toString().trim(),cat=String.valueOf(category.getSelectedItem());if(text.isEmpty()||author.isEmpty()||work.isEmpty()){Toast.makeText(this,"请填写句子、作者和出处",Toast.LENGTH_SHORT).show();return;}Set<String> set=new HashSet<>(p.getStringSet("custom_quotes",new HashSet<String>()));set.add(text+"|"+author+"|"+work+"|"+cat);p.edit().putStringSet("custom_quotes",set).apply();t.setText("");a.setText("");w.setText("");Toast.makeText(this,"已加入“"+cat+"”分类",Toast.LENGTH_SHORT).show();});findViewById(R.id.refresh_all).setOnClickListener(v->{sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));Toast.makeText(this,"已应用并刷新小组件",Toast.LENGTH_SHORT).show();});BottomNavigationView nav=findViewById(R.id.bottom_nav);nav.setOnItemSelectedListener(item->{boolean theme=item.getItemId()==R.id.nav_theme;findViewById(R.id.quotes_panel).setVisibility(theme?View.GONE:View.VISIBLE);findViewById(R.id.theme_panel).setVisibility(theme?View.VISIBLE:View.GONE);return true;});}
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.SeekBar;
+import android.widget.Spinner;
+import android.widget.Switch;
+import android.widget.Toast;
+
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+
+public class SettingsActivity extends Activity {
+
+    private SharedPreferences prefs;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_settings);
+        prefs = getSharedPreferences("settings", 0);
+
+        findViewById(R.id.manage_quotes).setOnClickListener(v -> startActivity(new Intent(this, ManageQuotesActivity.class)));
+        findViewById(R.id.add_widget).setOnClickListener(v -> new WidgetPinHelper(this).add());
+
+        bindOrderMode();
+        bindCategory();
+        bindParaphraseSwitch();
+        bindFontSize();
+        bindMonet();
+        bindThemeColor();
+        bindAddQuote();
+        bindRefreshAll();
+        bindBottomNav();
+    }
+
+    private void bindOrderMode() {
+        Spinner mode = findViewById(R.id.order_mode);
+        mode.setAdapter(ArrayAdapter.createFromResource(this, R.array.order_modes,
+                android.R.layout.simple_spinner_dropdown_item));
+        mode.setSelection(prefs.getBoolean("randomMode", true) ? 0 : 1);
+        mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                prefs.edit().putBoolean("randomMode", position == 0).apply();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void bindCategory() {
+        Spinner category = findViewById(R.id.custom_category);
+        ArrayList<String> cats = new ArrayList<>();
+        cats.add("用户");
+        cats.add("哲学");
+        for (String saved : prefs.getStringSet("categories", new HashSet<String>())) {
+            if (!cats.contains(saved)) cats.add(saved);
+        }
+        category.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, cats));
+    }
+
+    private void bindParaphraseSwitch() {
+        Switch show = findViewById(R.id.show_paraphrase);
+        show.setChecked(prefs.getBoolean("paraphrase", true));
+        show.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean("paraphrase", checked).apply());
+    }
+
+    private void bindFontSize() {
+        SeekBar size = findViewById(R.id.font_size);
+        size.setProgress(prefs.getInt("fontSize", 16) - 12);
+        size.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                prefs.edit().putInt("fontSize", progress + 12).apply();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+    }
+
+    private void bindMonet() {
+        CheckBox monet = findViewById(R.id.monet);
+        monet.setChecked(prefs.getBoolean("monet", false));
+        monet.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean("monet", checked).apply());
+    }
+
+    private void bindThemeColor() {
+        ColorPickerView picker = findViewById(R.id.color_picker);
+        picker.setOnColorChangedListener(color ->
+                prefs.edit().putInt("themeColor", color).apply());
+    }
+
+    private void bindAddQuote() {
+        findViewById(R.id.add_quote).setOnClickListener(v -> {
+            EditText textField = findViewById(R.id.custom_text);
+            EditText authorField = findViewById(R.id.custom_author);
+            EditText workField = findViewById(R.id.custom_work);
+            Spinner category = findViewById(R.id.custom_category);
+
+            String text = textField.getText().toString().trim();
+            String author = authorField.getText().toString().trim();
+            String work = workField.getText().toString().trim();
+            String cat = String.valueOf(category.getSelectedItem());
+            if (text.isEmpty() || author.isEmpty() || work.isEmpty()) {
+                Toast.makeText(this, "请填写句子、作者和出处", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Set<String> quotes = new HashSet<>(prefs.getStringSet("custom_quotes", new HashSet<String>()));
+            quotes.add(text + "|" + author + "|" + work + "|" + cat);
+            prefs.edit().putStringSet("custom_quotes", quotes).apply();
+            textField.setText("");
+            authorField.setText("");
+            workField.setText("");
+            Toast.makeText(this, "已加入“" + cat + "”分类", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void bindRefreshAll() {
+        findViewById(R.id.refresh_all).setOnClickListener(v -> {
+            sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
+            Toast.makeText(this, "已应用并刷新小组件", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void bindBottomNav() {
+        BottomNavigationView nav = findViewById(R.id.bottom_nav);
+        nav.setOnItemSelectedListener(item -> {
+            boolean theme = item.getItemId() == R.id.nav_theme;
+            findViewById(R.id.quotes_panel).setVisibility(theme ? View.GONE : View.VISIBLE);
+            findViewById(R.id.theme_panel).setVisibility(theme ? View.VISIBLE : View.GONE);
+            return true;
+        });
+    }
 }
