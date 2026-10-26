@@ -303,7 +303,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="毛玻璃" />
+                                android:text="液态玻璃" />
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/glass_material_liquid"
@@ -311,7 +311,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="液态玻璃" />
+                                android:text="毛玻璃" />
                         </com.google.android.material.button.MaterialButtonToggleGroup>
 
                         <TextView

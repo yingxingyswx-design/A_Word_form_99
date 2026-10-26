@@ -21,6 +21,14 @@
 - 语料中的句子著作权归各原作者所有；原作者要求下架的可联系上游 `i@loli.online`，本仓库同步移除。
 - 若你不想承担 AGPL 义务，可以删除 `assets/hitokoto_sentences.txt`，改用设置里的在线模式（`https://v1.hitokoto.cn/`，接口调用不受传染）。
 
+## 应用图标字体：JetBrains Mono
+
+4.0.1 起应用图标使用 **JetBrains Mono Bold** 排版，并把字形转换为矢量路径：
+
+- 字体仓库：<https://github.com/JetBrains/JetBrainsMono>
+- 授权：**SIL Open Font License 1.1**
+- 用法：仅用于生成图标字形轮廓，App 不打包字体文件。
+
 ## 其他
 
 - 应用名：每日一言 / DailyLine

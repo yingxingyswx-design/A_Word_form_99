@@ -57,16 +57,8 @@ public class LiquidGlassActivity extends AppCompatActivity {
         hint = findViewById(R.id.liquid_hint);
         findViewById(R.id.liquid_close).setOnClickListener(v -> finish());
 
-        MaterialButtonToggleGroup group = findViewById(R.id.liquid_material_group);
-        group.check(GlassRenderer.MATERIAL_LIQUID.equals(material)
-                ? R.id.liquid_material_liquid : R.id.liquid_material_frost);
-        group.addOnButtonCheckedListener((g, checkedId, isChecked) -> {
-            if (!isChecked) return;
-            material = checkedId == R.id.liquid_material_liquid
-                    ? GlassRenderer.MATERIAL_LIQUID : GlassRenderer.MATERIAL_FROST;
-            prefs.edit().putString(GlassRenderer.KEY_MATERIAL, material).apply();
-            applyGlass();
-        });
+        findViewById(R.id.liquid_material_group).setVisibility(android.view.View.GONE);
+        material = GlassRenderer.MATERIAL_FROST;
 
         setupGlassCard();
 
@@ -168,7 +160,7 @@ public class LiquidGlassActivity extends AppCompatActivity {
 
     private void applyGlass() {
         GlassRenderer.Spec spec = GlassRenderer.spec(this, prefs);
-        boolean frost = GlassRenderer.MATERIAL_FROST.equals(material);
+        boolean frost = true;
         float frostDp = frost
                 ? 8f + spec.blur * 18f
                 : 1.0f + spec.blur * 3f;

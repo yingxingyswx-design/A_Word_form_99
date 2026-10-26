@@ -2,8 +2,12 @@
     <color name="ink">#E7E1EA</color>
     <color name="paper">#16141A</color>
     <color name="accent">#D0BCFF</color>
-    <color name="icon_background">#211F24</color>
+    <color name="icon_background">#17151C</color>
     <color name="icon_foreground_tint">#D0BCFF</color>
+    <color name="icon_top">#4F378B</color>
+    <color name="icon_gutter">#1E1B22</color>
+    <color name="icon_divider">#3A3440</color>
+    <color name="icon_highlight">#332D41</color>
 
     <color name="md_primary">#D0BCFF</color>
     <color name="md_on_primary">#381E72</color>

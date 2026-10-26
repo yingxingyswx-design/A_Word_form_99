@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DailyLine launcher background: editor title bar, gutter and selected line.
+     Colours have values-night variants so the normal adaptive icon follows the
+     system light/dark setting. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/icon_background"
+        android:pathData="M0,0H108V108H0Z" />
+    <path
+        android:fillColor="@color/icon_top"
+        android:pathData="M0,0H108V36H0Z" />
+    <path
+        android:fillColor="@color/icon_gutter"
+        android:pathData="M0,36H31.33V108H0Z" />
+    <path
+        android:fillColor="@color/icon_divider"
+        android:pathData="M30.73,36H31.53V108H30.73Z" />
+    <path
+        android:fillColor="@color/icon_highlight"
+        android:pathData="M34.33,38.5 H82.67 A2.33,2.33 0 0 1 85,40.83 V53.27 A2.33,2.33 0 0 1 82.67,55.6 H34.33 A2.33,2.33 0 0 1 32,53.27 V40.83 A2.33,2.33 0 0 1 34.33,38.5 Z" />
+</vector>

@@ -56,6 +56,8 @@ public final class GlassRenderer {
 
     private static final String TAG = "99YIYAN_LOG";
     private static final long MAX_PIXELS = 2_600_000L;
+    /** 毛玻璃固定雾化程度（不跟滑块）。 */
+    private static final float FIXED_BLUR = 0.62f;
     private static final float FROST_MAX_WIDTH = 760f;
     private static final float LIQUID_MAX_WIDTH = 900f;
     private static final double SQUIRCLE_N = 4.0;
@@ -201,11 +203,9 @@ public final class GlassRenderer {
                                 Bitmap wallpaper, Rect crop) {
         float density = context.getResources().getDisplayMetrics().density;
         if (spec == null) spec = new Spec();
-        if (spec.isFrost()) {
-            return renderLens(wallpaper, widthPx, heightPx, spec, density, false, crop);
-        }
+        // 只有一种材质：液态玻璃（透镜管线），雾化程度跟滑块
         if (wallpaper != null && !wallpaper.isRecycled()) {
-            return renderLens(wallpaper, widthPx, heightPx, spec, density, true, crop);
+            return renderLens(wallpaper, widthPx, heightPx, spec, density, false, crop);
         }
         return renderLiquidFallback(widthPx, heightPx, spec, density);
     }

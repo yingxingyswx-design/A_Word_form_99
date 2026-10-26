@@ -2,8 +2,12 @@
     <color name="ink">#1C1B1F</color>
     <color name="paper">#FDF8F3</color>
     <color name="accent">#6750A4</color>
-    <color name="icon_background">#FFF9F0</color>
-    <color name="icon_foreground_tint">#24212A</color>
+    <color name="icon_background">#FFFCF7</color>
+    <color name="icon_foreground_tint">#1C1B1F</color>
+    <color name="icon_top">#7073A6</color>
+    <color name="icon_gutter">#F5F1EA</color>
+    <color name="icon_divider">#DED8CE</color>
+    <color name="icon_highlight">#FFF4D6</color>
 
     <!-- Material 3 品牌色板（动态取色可用时会被壁纸色替换） -->
     <color name="md_primary">#6750A4</color>

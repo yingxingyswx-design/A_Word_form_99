@@ -130,27 +130,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         com.google.android.material.button.MaterialButtonToggleGroup material =
                 findViewById(R.id.glass_material_group);
-        String savedMaterial = prefs.getString(GlassRenderer.KEY_MATERIAL,
-                GlassRenderer.MATERIAL_FROST);
-        material.check(GlassRenderer.MATERIAL_LIQUID.equals(savedMaterial)
-                ? R.id.glass_material_liquid : R.id.glass_material_frost);
-        material.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-            if (!isChecked) return;
-            String value = checkedId == R.id.glass_material_liquid
-                    ? GlassRenderer.MATERIAL_LIQUID : GlassRenderer.MATERIAL_FROST;
-            prefs.edit().putString(GlassRenderer.KEY_MATERIAL, value).apply();
-            previewSpec();
-            scheduleWidgetRefresh();
-            if (GlassRenderer.MATERIAL_FROST.equals(value) && !WallpaperSource.canRead(this)) {
-                Toast.makeText(this, "毛玻璃要读壁纸才能模糊：请点下面的「去授权」",
-                        Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, GlassRenderer.MATERIAL_LIQUID.equals(value)
-                                ? "已切换：液态玻璃（透明，桌面壁纸实时透出）"
-                                : "已切换：毛玻璃（真实壁纸模糊）",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
+        material.setVisibility(android.view.View.GONE);
+        prefs.edit().putString(GlassRenderer.KEY_MATERIAL, GlassRenderer.MATERIAL_FROST).apply();
 
         findViewById(R.id.open_live_glass).setOnClickListener(v ->
                 startActivity(new Intent(this, LiquidGlassActivity.class)));
@@ -228,8 +209,8 @@ public class SettingsActivity extends AppCompatActivity {
         boolean granted = WallpaperSource.canRead(this);
         TextView status = findViewById(R.id.glass_wallpaper_status);
         status.setText(granted
-                ? "壁纸读取：已授权 · 毛玻璃会真的模糊桌面壁纸"
-                : "壁纸读取：未授权 · 毛玻璃只会取壁纸颜色，不会模糊");
+                ? "壁纸读取：已授权 · 玻璃会真的模糊桌面壁纸"
+                : "壁纸读取：未授权 · 玻璃只会取壁纸颜色，不会模糊");
         findViewById(R.id.glass_wallpaper_grant).setEnabled(!granted);
     }
 
