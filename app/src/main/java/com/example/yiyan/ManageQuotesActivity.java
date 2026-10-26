@@ -1,7 +1,8 @@
 package com.example.yiyan;
 
-import android.app.Activity;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -37,7 +38,7 @@ import java.util.Locale;
  * 作者、出处、配图都是可选的，编辑时只有句子必填。
  * 配图通过系统文件选择器（SAF）选中后立刻复制到私有目录，支持 GIF。
  */
-public class ManageQuotesActivity extends Activity {
+public class ManageQuotesActivity extends AppCompatActivity {
 
     private static final String ALL = "全部";
     private static final String DEFAULT_CATEGORY = "用户";
@@ -230,10 +231,21 @@ public class ManageQuotesActivity extends Activity {
             if (!ALL.equals(selected) && !item.category.equals(selected)) continue;
 
             final int index = items.indexOf(item);
+            com.google.android.material.card.MaterialCardView holder =
+                    new com.google.android.material.card.MaterialCardView(this);
+            holder.setRadius(dp(22));
+            holder.setCardElevation(0);
+            holder.setCardBackgroundColor(com.google.android.material.color.MaterialColors.getColor(
+                    holder, com.google.android.material.R.attr.colorSurfaceContainer));
+            holder.setClickable(true);
+            holder.setFocusable(true);
+            holder.setOnClickListener(v -> edit(index));
+
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.HORIZONTAL);
-            card.setPadding(dp(20), dp(18), dp(20), dp(18));
-            card.setOnClickListener(v -> edit(index));
+            card.setPadding(dp(20), dp(16), dp(20), dp(16));
+            holder.addView(card, new com.google.android.material.card.MaterialCardView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             TextView body = new TextView(this);
             StringBuilder text = new StringBuilder();
@@ -256,11 +268,11 @@ public class ManageQuotesActivity extends Activity {
                 card.addView(preview, lp);
             }
 
-            flow.addView(card, new LinearLayout.LayoutParams(
+            flow.addView(holder, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             Space gap = new Space(this);
-            flow.addView(gap, new LinearLayout.LayoutParams(1, dp(12)));
+            flow.addView(gap, new LinearLayout.LayoutParams(1, dp(10)));
         }
     }
 
@@ -290,7 +302,7 @@ public class ManageQuotesActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(box);
 
-        editDialog = new AlertDialog.Builder(this)
+        editDialog = new MaterialAlertDialogBuilder(this)
                 .setTitle("编辑第 " + (index + 1) + " 句")
                 .setView(scroll)
                 .setNegativeButton("取消", null)

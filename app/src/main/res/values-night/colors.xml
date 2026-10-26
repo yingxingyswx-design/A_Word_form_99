@@ -1,1 +1,22 @@
-<resources><color name="ink">#F4EFF7</color><color name="paper">#211F24</color><color name="accent">#D0BCFF</color><color name="icon_background">#211F24</color><color name="icon_foreground_tint">#D0BCFF</color></resources>
+<resources>
+    <color name="ink">#E7E1EA</color>
+    <color name="paper">#16141A</color>
+    <color name="accent">#D0BCFF</color>
+    <color name="icon_background">#211F24</color>
+    <color name="icon_foreground_tint">#D0BCFF</color>
+
+    <color name="md_primary">#D0BCFF</color>
+    <color name="md_on_primary">#381E72</color>
+    <color name="md_primary_container">#4F378B</color>
+    <color name="md_on_primary_container">#EADDFF</color>
+    <color name="md_secondary">#CCC2DC</color>
+    <color name="md_on_secondary">#332D41</color>
+    <color name="md_secondary_container">#4A4458</color>
+    <color name="md_on_secondary_container">#E8DEF8</color>
+    <color name="md_surface">#16141A</color>
+    <color name="md_surface_container">#221F26</color>
+    <color name="md_surface_container_high">#2B2730</color>
+    <color name="md_on_surface">#E7E1EA</color>
+    <color name="md_on_surface_variant">#CAC4CF</color>
+    <color name="md_outline">#948F99</color>
+</resources>

@@ -1,6 +1,5 @@
 package com.example.yiyan;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -8,20 +7,21 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.SeekBar;
 import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.slider.Slider;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
-public class SettingsActivity extends Activity {
+public class SettingsActivity extends AppCompatActivity {
 
     private SharedPreferences prefs;
 
@@ -48,7 +48,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void bindCustomLayout() {
-        final Switch custom = findViewById(R.id.custom_layout);
+        final MaterialSwitch custom = findViewById(R.id.custom_layout);
         custom.setChecked(prefs.getBoolean("customLayout", false));
         custom.setOnCheckedChangeListener((button, checked) -> {
             prefs.edit().putBoolean("customLayout", checked).apply();
@@ -95,33 +95,25 @@ public class SettingsActivity extends Activity {
     }
 
     private void bindParaphraseSwitch() {
-        Switch show = findViewById(R.id.show_paraphrase);
+        MaterialSwitch show = findViewById(R.id.show_paraphrase);
         show.setChecked(prefs.getBoolean("paraphrase", true));
         show.setOnCheckedChangeListener((button, checked) ->
                 prefs.edit().putBoolean("paraphrase", checked).apply());
     }
 
     private void bindFontSize() {
-        SeekBar size = findViewById(R.id.font_size);
-        size.setProgress(prefs.getInt("fontSize", 16) - 12);
-        size.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                prefs.edit().putInt("fontSize", progress + 12).apply();
-            }
+        Slider size = findViewById(R.id.font_size);
+        size.setValue(clampFontSize(prefs.getInt("fontSize", 16)));
+        size.addOnChangeListener((slider, value, fromUser) ->
+                prefs.edit().putInt("fontSize", Math.round(value)).apply());
+    }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-            }
-        });
+    private float clampFontSize(int value) {
+        return Math.max(12f, Math.min(28f, value));
     }
 
     private void bindMonet() {
-        CheckBox monet = findViewById(R.id.monet);
+        MaterialSwitch monet = findViewById(R.id.monet);
         monet.setChecked(prefs.getBoolean("monet", false));
         monet.setOnCheckedChangeListener((button, checked) ->
                 prefs.edit().putBoolean("monet", checked).apply());

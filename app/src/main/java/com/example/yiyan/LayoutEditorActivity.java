@@ -1,12 +1,12 @@
 package com.example.yiyan;
 
-import android.app.Activity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.widget.Switch;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,7 +17,7 @@ import android.widget.Toast;
  * 图片支持多个（上限 4 个）、删除、旋转 90°、水平/垂直镜像。
  * 小组件尺寸用「宽 +/− / 高 +/−」调整，编辑器会把画布按同样的宽高比显示。
  */
-public class LayoutEditorActivity extends Activity {
+public class LayoutEditorActivity extends AppCompatActivity {
 
     private static final int REQUEST_PICK_IMAGE = 4301;
     private static final int MAX_IMAGES = 4;
@@ -44,7 +44,7 @@ public class LayoutEditorActivity extends Activity {
         reloadBitmaps();
         updateHint();
 
-        Switch boxSwitch = findViewById(R.id.sw_text_box);
+        MaterialSwitch boxSwitch = findViewById(R.id.sw_text_box);
         boxSwitch.setChecked(scene.textBox);
         boxSwitch.setOnCheckedChangeListener((button, checked) -> {
             scene.textBox = checked;

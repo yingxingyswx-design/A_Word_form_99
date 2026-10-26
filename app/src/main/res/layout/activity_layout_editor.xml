@@ -1,48 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingHorizontal="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
     <TextView
         android:id="@+id/editor_hint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="拖动框体移动，拖右下角改大小；文字与图片不允许重叠"
-        android:textSize="12sp" />
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
-    <com.example.yiyan.LayoutCanvasView
-        android:id="@+id/layout_canvas"
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Yiyan.Card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_marginTop="8dp"
+        android:layout_weight="1"
+        app:cardCornerRadius="28dp"
+        app:contentPadding="0dp">
+
+        <com.example.yiyan.LayoutCanvasView
+            android:id="@+id/layout_canvas"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </com.google.android.material.card.MaterialCardView>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_add_image"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="添加图片" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_delete"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="删除" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_rotate"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="旋转 90°" />
+            android:text="旋转" />
     </LinearLayout>
 
     <LinearLayout
@@ -50,25 +68,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_flip_h"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="水平镜像" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_flip_v"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="垂直镜像" />
 
-        <Switch
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sw_text_box"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_weight="1.2"
             android:text="文字框" />
     </LinearLayout>
 
@@ -77,29 +97,33 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_width_minus"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="宽 -" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_width_plus"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="宽 +" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_height_minus"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="高 -" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_height_plus"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -111,15 +135,17 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_reset"
+            style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="恢复默认" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_save"
+            style="@style/Widget.Yiyan.Button"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

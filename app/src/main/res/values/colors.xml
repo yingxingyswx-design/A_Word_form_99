@@ -1,1 +1,23 @@
-<resources><color name="ink">#24212A</color><color name="paper">#FFF9F0</color><color name="accent">#6750A4</color><color name="icon_background">#FFF9F0</color><color name="icon_foreground_tint">#24212A</color></resources>
+<resources>
+    <color name="ink">#1C1B1F</color>
+    <color name="paper">#FDF8F3</color>
+    <color name="accent">#6750A4</color>
+    <color name="icon_background">#FFF9F0</color>
+    <color name="icon_foreground_tint">#24212A</color>
+
+    <!-- Material 3 品牌色板（动态取色可用时会被壁纸色替换） -->
+    <color name="md_primary">#6750A4</color>
+    <color name="md_on_primary">#FFFFFF</color>
+    <color name="md_primary_container">#EADDFF</color>
+    <color name="md_on_primary_container">#21005D</color>
+    <color name="md_secondary">#63597C</color>
+    <color name="md_on_secondary">#FFFFFF</color>
+    <color name="md_secondary_container">#E9DEF8</color>
+    <color name="md_on_secondary_container">#1F1735</color>
+    <color name="md_surface">#FDF8F3</color>
+    <color name="md_surface_container">#F3EBE2</color>
+    <color name="md_surface_container_high">#EDE3D8</color>
+    <color name="md_on_surface">#1C1B1F</color>
+    <color name="md_on_surface_variant">#49454F</color>
+    <color name="md_outline">#7A757F</color>
+</resources>
