@@ -74,19 +74,17 @@ public class SettingsActivity extends AppCompatActivity {
     private void requestPrivileges() {
         new Thread(() -> {
             final boolean root = RootHomeWatcher.requestRoot();
-            final boolean shizukuRunning = RootHomeWatcher.hasShizuku();
-            final boolean shizukuGranted = shizukuRunning && RootHomeWatcher.shizukuGranted();
             final boolean shizukuInstalled = RootHomeWatcher.shizukuInstalled(this);
+            // 没授权时 Shizuku 不会把 binder 给我们，所以「拿不到 binder」不能当成「没运行」
+            final boolean shizukuRunning = RootHomeWatcher.awaitShizuku(1500);
+            final boolean shizukuGranted = shizukuRunning && RootHomeWatcher.shizukuGranted();
             runOnUiThread(() -> {
-                if (shizukuRunning && !shizukuGranted) {
+                if (shizukuInstalled && !shizukuGranted) {
                     RootHomeWatcher.requestShizukuPermission();
                 }
                 refreshRootStatus(findViewById(R.id.root_status));
-                if (!root && !shizukuRunning) {
-                    Toast.makeText(this, shizukuInstalled
-                                    ? "Shizuku 未运行：请先启动 Shizuku 再回来开启"
-                                    : "没有 root，也没检测到 Shizuku",
-                            Toast.LENGTH_LONG).show();
+                if (!root && !shizukuInstalled) {
+                    Toast.makeText(this, "没有 root，也没安装 Shizuku", Toast.LENGTH_LONG).show();
                 }
             });
         }).start();
@@ -191,7 +189,7 @@ public class SettingsActivity extends AppCompatActivity {
                 button.setEnabled(false);
                 new Thread(() -> {
                     boolean root = RootHomeWatcher.hasRoot();
-                    boolean shizuku = RootHomeWatcher.hasShizuku();
+                    boolean shizuku = RootHomeWatcher.awaitShizuku(2500);
                     if (!root && shizuku && !RootHomeWatcher.shizukuGranted()) {
                         runOnUiThread(() -> {
                             button.setEnabled(true);
@@ -258,9 +256,10 @@ public class SettingsActivity extends AppCompatActivity {
             final boolean running = RootHomeWatcher.isRunning(this);
             final String backend = RootHomeWatcher.backend(this);
             final boolean root = RootHomeWatcher.rootGranted();
-            final boolean shizukuRunning = RootHomeWatcher.hasShizuku();
+            final boolean installed = RootHomeWatcher.shizukuInstalled(this);
+            final boolean shizukuRunning = RootHomeWatcher.awaitShizuku(1200);
             final boolean shizukuGranted = shizukuRunning && RootHomeWatcher.shizukuGranted();
-            final String shizukuText = !shizukuRunning ? "未运行"
+            final String shizukuText = !installed ? "未安装"
                     : (shizukuGranted ? "已授权" : "未授权");
             final String label = RootHomeWatcher.BACKEND_SHIZUKU.equals(backend)
                     ? "Shizuku" : "root";

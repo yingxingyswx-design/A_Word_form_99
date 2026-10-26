@@ -19,5 +19,13 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+        <!-- Shizuku 的 binder 靠这个 Provider 注入；shizuku_server 以 shell 身份来取，
+             所以这里不能加 moe.shizuku.manager.permission.API_V23（shell 不持有该权限）。 -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false" />
     </application>
 </manifest>

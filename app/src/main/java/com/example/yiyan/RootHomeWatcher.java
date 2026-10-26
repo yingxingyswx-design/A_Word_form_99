@@ -65,6 +65,25 @@ public final class RootHomeWatcher {
         }
     }
 
+    /**
+     * 等 Shizuku 的 binder 送达。
+     *
+     * binder 是 ShizukuProvider 在进程启动时异步塞进来的，刚打开 App 时
+     * pingBinder() 还是 false；这里轮询一小会儿，避免把「还没送到」误判成「没运行」。
+     */
+    public static boolean awaitShizuku(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (hasShizuku()) return true;
+            try {
+                Thread.sleep(120);
+            } catch (InterruptedException e) {
+                return hasShizuku();
+            }
+        }
+        return hasShizuku();
+    }
+
     /** 进入 App 时主动向 root 管理器要一次权限（Magisk 会弹授权框）。 */
     public static boolean requestRoot() {
         // 第一次调用会触发 Magisk 的授权对话框；已授权则直接返回 uid=0
@@ -119,11 +138,11 @@ public final class RootHomeWatcher {
             }
         }
 
-        if (hasShizuku() && shizukuGranted()) {
+        if (awaitShizuku(1500) && shizukuGranted()) {
             String command = "cat > " + SHIZUKU_SCRIPT + " <<'YIYAN_EOF'\n" + script + "YIYAN_EOF\n"
                     + "chmod 700 " + SHIZUKU_SCRIPT + "\n"
                     + "nohup sh " + SHIZUKU_SCRIPT + " >/dev/null 2>&1 &\n";
-            String output = runShizuku(command, 6000);
+            String output = runShizuku(command, 8000);
             boolean running = isRunning(context);
             Log.i(TAG, "回桌面监听（Shizuku）" + (running ? "已启动" : "启动失败") + " / " + output);
             if (running) {
@@ -138,7 +157,7 @@ public final class RootHomeWatcher {
 
     public static void stop(Context context) {
         runSu("pkill -f " + SCRIPT_NAME, 3000);
-        if (hasShizuku() && shizukuGranted()) {
+        if ((hasShizuku() || awaitShizuku(600)) && shizukuGranted()) {
             runShizuku("pkill -f " + SCRIPT_NAME, 3000);
         }
         Log.i(TAG, "回桌面监听已停止");
@@ -147,9 +166,11 @@ public final class RootHomeWatcher {
     public static boolean isRunning(Context context) {
         String output = runSu("pgrep -f " + SCRIPT_NAME, 3000);
         if (output != null && output.trim().length() > 0) return true;
-        if (hasShizuku() && shizukuGranted()) {
-            String shizuku = runShizuku("pgrep -f " + SCRIPT_NAME, 3000);
-            return shizuku != null && shizuku.trim().length() > 0;
+        if (hasShizuku() || awaitShizuku(400)) {
+            if (shizukuGranted()) {
+                String shizuku = runShizuku("pgrep -f " + SCRIPT_NAME, 3000);
+                return shizuku != null && shizuku.trim().length() > 0;
+            }
         }
         return false;
     }
