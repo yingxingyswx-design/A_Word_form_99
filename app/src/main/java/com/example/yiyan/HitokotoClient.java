@@ -23,7 +23,16 @@ final class HitokotoClient {
     private static final String CACHE_KEY = "hitokoto_cache";
     private static final String TAG = "99YIYAN_LOG";
 
-    static final String CATEGORY = "随机";
+    /** API 的 type 字母 → 中文分类，和内置语料保持一致。 */
+    private static final String[] TYPE_NAMES = {
+            "动画", "漫画", "游戏", "文学", "原创", "来自网络",
+            "其他", "影视", "诗词", "网易云", "哲学", "抖机灵"};
+
+    static String categoryOf(String type) {
+        if (type == null || type.length() != 1) return "其他";
+        int index = type.charAt(0) - 'a';
+        return index >= 0 && index < TYPE_NAMES.length ? TYPE_NAMES[index] : "其他";
+    }
 
     private HitokotoClient() {
     }
@@ -45,7 +54,7 @@ final class HitokotoClient {
         String author = json.optString("from_who", "").trim();
         if (author.isEmpty()) author = work;
         if (author.equals(work)) work = "";
-        return new Quote(text, author, work, CATEGORY, CATEGORY);
+        return new Quote(text, author, work, "Hitokoto", categoryOf(json.optString("type", "")));
     }
 
     static void cache(SharedPreferences prefs, Quote quote) {
@@ -53,7 +62,7 @@ final class HitokotoClient {
     }
 
     static Quote cached(SharedPreferences prefs) {
-        Quote quote = Quote.parse(prefs.getString(CACHE_KEY, ""), CATEGORY, CATEGORY);
+        Quote quote = Quote.parse(prefs.getString(CACHE_KEY, ""), "Hitokoto", "其他");
         if (quote != null) Log.i(TAG, "使用缓存的一言：" + quote.text);
         return quote;
     }

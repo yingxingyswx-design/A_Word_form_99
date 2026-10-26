@@ -43,8 +43,10 @@ public class ManageQuotesActivity extends AppCompatActivity {
     private static final String ALL = "全部";
     private static final String DEFAULT_CATEGORY = "用户";
     /** App 自带分类：随机（在线 hitokoto），不可删除。 */
-    private static final String RANDOM_CATEGORY = "随机";
+
     private static final int REQUEST_PICK_IMAGE = 4201;
+    private static final int PAGE_SIZE = 120;
+    private int shownLimit = PAGE_SIZE;
 
     private LinearLayout flow;
     private Spinner categoryFilter;
@@ -124,8 +126,8 @@ public class ManageQuotesActivity extends AppCompatActivity {
         delete.setOnClickListener(v -> {
             String selected = String.valueOf(categoryFilter.getSelectedItem());
             if (ALL.equals(selected) || "哲学".equals(selected)
-                    || DEFAULT_CATEGORY.equals(selected) || RANDOM_CATEGORY.equals(selected)) {
-                Toast.makeText(this, "内置分类不可删除（哲学 / 用户 / 随机）", Toast.LENGTH_SHORT).show();
+                    || DEFAULT_CATEGORY.equals(selected)) {
+                Toast.makeText(this, "内置分类不可删除（哲学 / 用户）", Toast.LENGTH_SHORT).show();
                 return;
             }
             categories.remove(selected);
@@ -144,7 +146,11 @@ public class ManageQuotesActivity extends AppCompatActivity {
     private void loadCategories() {
         categories.add("哲学");
         categories.add(DEFAULT_CATEGORY);
-        categories.add(RANDOM_CATEGORY);
+        if (prefs.getBoolean("showHitokoto", true)) {
+            for (String category : HitokotoLibrary.categories(this)) {
+                if (!categories.contains(category)) categories.add(category);
+            }
+        }
         for (String saved : prefs.getStringSet("categories", new HashSet<String>())) {
             if (!categories.contains(saved)) categories.add(saved);
         }
@@ -190,6 +196,10 @@ public class ManageQuotesActivity extends AppCompatActivity {
         for (String line : prefs.getStringSet("custom_quotes", new HashSet<String>())) {
             addUnique(Quote.parse(line, "用户添加", DEFAULT_CATEGORY));
         }
+        // 内置 Hitokoto 语料（12 个原始分类），只读展示；可在设置里关闭
+        if (prefs.getBoolean("showHitokoto", true)) {
+            items.addAll(HitokotoLibrary.quotes(this));
+        }
         android.util.Log.i("99YIYAN_LOG", "管理页加载一言 " + items.size() + " 条");
         render("");
     }
@@ -206,11 +216,12 @@ public class ManageQuotesActivity extends AppCompatActivity {
         items.add(quote);
     }
 
-    /** 只把句子非空的条目写回存储；作者/出处/配图为空都是允许的。 */
+    /** 只把句子非空的条目写回存储；内置 Hitokoto 语料不落盘。 */
     private void persist() {
         StringBuilder out = new StringBuilder();
         for (Quote quote : items) {
             if (quote.text.trim().isEmpty()) continue;
+            if (HitokotoLibrary.KIND.equals(quote.kind)) continue;
             out.append(quote.toLine()).append('\n');
         }
         prefs.edit().putString("editable_library", out.toString()).apply();
@@ -227,14 +238,18 @@ public class ManageQuotesActivity extends AppCompatActivity {
         String keyword = query.trim().toLowerCase(Locale.ROOT);
         String selected = categoryFilter == null ? ALL : String.valueOf(categoryFilter.getSelectedItem());
         int number = 1;
+        int matched = 0;
 
-        for (Quote item : items) {
+        for (int i = 0; i < items.size(); i++) {
+            Quote item = items.get(i);
             String haystack = (item.text + " " + item.author + " " + item.work + " " + item.category)
                     .toLowerCase(Locale.ROOT);
             if (!keyword.isEmpty() && !haystack.contains(keyword)) continue;
             if (!ALL.equals(selected) && !item.category.equals(selected)) continue;
+            matched++;
+            if (matched > shownLimit) continue;
 
-            final int index = items.indexOf(item);
+            final int index = i;
             com.google.android.material.card.MaterialCardView holder =
                     new com.google.android.material.card.MaterialCardView(this);
             holder.setRadius(dp(22));
@@ -278,12 +293,36 @@ public class ManageQuotesActivity extends AppCompatActivity {
             Space gap = new Space(this);
             flow.addView(gap, new LinearLayout.LayoutParams(1, dp(10)));
         }
+
+        // 内置语料上万条，一次只铺一屏多一点，剩下的点按钮追加
+        if (matched > shownLimit) {
+            int remaining = matched - shownLimit;
+            com.google.android.material.button.MaterialButton more =
+                    new com.google.android.material.button.MaterialButton(this);
+            more.setText("显示更多（剩余 " + remaining + " 条）");
+            more.setOnClickListener(v -> {
+                shownLimit += PAGE_SIZE;
+                render(query);
+            });
+            flow.addView(more, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
     }
 
     // ---- 编辑 ----
 
     private void edit(int index) {
         final Quote old = items.get(index);
+        if (HitokotoLibrary.KIND.equals(old.kind)) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("内置 Hitokoto 语料")
+                    .setMessage(old.text + "\n\n" + old.source()
+                            + "\n分类：" + old.category
+                            + "\n\n这条来自 App 内置语料，只读；可在「设置 → 显示」里整体关闭。")
+                    .setPositiveButton("知道了", null)
+                    .show();
+            return;
+        }
         editIndex = index;
         editOldImagePath = old.imagePath;
         editImagePath = old.imagePath;

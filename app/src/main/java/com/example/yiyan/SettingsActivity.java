@@ -27,7 +27,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     private static final int REQUEST_IMPORT_XML = 4401;
     private static final String KEY_UPDATE_CHANNEL = "updateChannel";
-    private static final String BUILT_IN_RANDOM_CATEGORY = "随机";
+
 
     private SharedPreferences prefs;
     private boolean autoChecked;
@@ -98,7 +98,7 @@ public class SettingsActivity extends AppCompatActivity {
         Spinner category = findViewById(R.id.custom_category);
         ArrayList<String> cats = new ArrayList<>();
         cats.add("用户");
-        cats.add(BUILT_IN_RANDOM_CATEGORY);
+
         cats.add("哲学");
         for (String saved : prefs.getStringSet("categories", new HashSet<String>())) {
             if (!cats.contains(saved)) cats.add(saved);
@@ -107,7 +107,7 @@ public class SettingsActivity extends AppCompatActivity {
                 android.R.layout.simple_spinner_dropdown_item, cats));
     }
 
-    /** 「随机」是 App 自带分类，删除分类时不可移除。 */
+    /** 在线随机一言开关。 */
     private void bindOnlineRandom() {
         MaterialSwitch online = findViewById(R.id.online_random);
         online.setChecked(prefs.getBoolean("onlineRandom", false));

@@ -254,7 +254,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="显示 Hitokoto 语料（随机分类 · 11186 条）"
+                            android:text="显示 Hitokoto 语料（12 个分类 · 11186 条）"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                         <TextView
