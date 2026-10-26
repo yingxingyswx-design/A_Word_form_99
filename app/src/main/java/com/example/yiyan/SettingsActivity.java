@@ -46,6 +46,7 @@ public class SettingsActivity extends AppCompatActivity {
         bindOrderMode();
         bindCategory();
         bindOnlineRandom();
+        bindShowHitokoto();
         bindParaphraseSwitch();
         bindFontSize();
         bindMonet();
@@ -115,6 +116,16 @@ public class SettingsActivity extends AppCompatActivity {
             sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
             Toast.makeText(this, checked ? "已切换到在线随机一言" : "已回到本地语料",
                     Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    /** 内置 Hitokoto 语料（随机分类）是否参与桌面轮换。 */
+    private void bindShowHitokoto() {
+        MaterialSwitch show = findViewById(R.id.show_hitokoto);
+        show.setChecked(prefs.getBoolean("showHitokoto", true));
+        show.setOnCheckedChangeListener((button, checked) -> {
+            prefs.edit().putBoolean("showHitokoto", checked).apply();
+            sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
         });
     }
 

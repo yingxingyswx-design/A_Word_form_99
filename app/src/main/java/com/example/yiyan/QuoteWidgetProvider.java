@@ -102,7 +102,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
 
     private void update(Context context, AppWidgetManager manager, int widgetId) {
         SharedPreferences prefs = context.getSharedPreferences("settings", 0);
-        List<Quote> candidates = candidates(prefs);
+        List<Quote> candidates = candidates(context, prefs);
 
         boolean onlineRandom = prefs.getBoolean("onlineRandom", false);
         Quote quote = null;
@@ -380,7 +380,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
      * 候选集：编辑过的库优先（整体替换内置语料），否则用内置意译条目，最后追加用户添加的。
      * 作者/出处为空的自定义条目同样有效，只有句子必填。
      */
-    private List<Quote> candidates(SharedPreferences prefs) {
+    private List<Quote> candidates(Context context, SharedPreferences prefs) {
         List<Quote> list = new ArrayList<>();
 
         String saved = prefs.getString("editable_library", "");
@@ -398,6 +398,11 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         for (String line : prefs.getStringSet("custom_quotes", new HashSet<String>())) {
             Quote quote = Quote.parse(line, "用户添加", "用户");
             if (quote != null) list.add(quote);
+        }
+
+        // 内置 Hitokoto 语料（分类「随机」），可在设置里关掉
+        if (prefs.getBoolean("showHitokoto", true)) {
+            list.addAll(HitokotoLibrary.quotes(context));
         }
         return list;
     }

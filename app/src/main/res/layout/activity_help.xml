@@ -179,10 +179,33 @@
                         android:text="进入「设置」会自动检查一次 GitHub Release；也可以手动点「检查 GitHub 更新」，发现有新版本后点「下载并安装更新」，首次安装需允许「安装未知应用」。"
                         android:textAppearance="?attr/textAppearanceBodyMedium" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Yiyan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="6 · 数据来源与授权"
+                        android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="App 内置 11186 条 Hitokoto 语料（分类「随机」），来自 hitokoto.cn 官方语句库 sentences-bundle，按 AGPL-3.0 随本 App 分发；原句著作权归各作者所有。可在「设置 → 显示」里关闭，关闭后不会参与桌面轮换。详见仓库 NOTICE.md。"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </ScrollView>
-
     <com.google.android.material.button.MaterialButton
         android:id="@+id/help_close"
         style="@style/Widget.Yiyan.Button"
