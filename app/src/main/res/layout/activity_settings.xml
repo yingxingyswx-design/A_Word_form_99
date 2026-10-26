@@ -131,6 +131,14 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/online_random"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="随机一言（在线 · hitokoto）"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

@@ -42,6 +42,8 @@ public class ManageQuotesActivity extends AppCompatActivity {
 
     private static final String ALL = "全部";
     private static final String DEFAULT_CATEGORY = "用户";
+    /** App 自带分类：随机（在线 hitokoto），不可删除。 */
+    private static final String RANDOM_CATEGORY = "随机";
     private static final int REQUEST_PICK_IMAGE = 4201;
 
     private LinearLayout flow;
@@ -121,8 +123,9 @@ public class ManageQuotesActivity extends AppCompatActivity {
         });
         delete.setOnClickListener(v -> {
             String selected = String.valueOf(categoryFilter.getSelectedItem());
-            if (ALL.equals(selected) || "哲学".equals(selected) || DEFAULT_CATEGORY.equals(selected)) {
-                Toast.makeText(this, "内置分类不可删除", Toast.LENGTH_SHORT).show();
+            if (ALL.equals(selected) || "哲学".equals(selected)
+                    || DEFAULT_CATEGORY.equals(selected) || RANDOM_CATEGORY.equals(selected)) {
+                Toast.makeText(this, "内置分类不可删除（哲学 / 用户 / 随机）", Toast.LENGTH_SHORT).show();
                 return;
             }
             categories.remove(selected);
@@ -141,6 +144,7 @@ public class ManageQuotesActivity extends AppCompatActivity {
     private void loadCategories() {
         categories.add("哲学");
         categories.add(DEFAULT_CATEGORY);
+        categories.add(RANDOM_CATEGORY);
         for (String saved : prefs.getStringSet("categories", new HashSet<String>())) {
             if (!categories.contains(saved)) categories.add(saved);
         }

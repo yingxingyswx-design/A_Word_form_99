@@ -3,6 +3,7 @@ package com.example.yiyan;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -51,7 +52,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
-        for (int id : ids) update(context, manager, id);
+        updateAsync(context, ids);
     }
 
     @Override
@@ -65,10 +66,27 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         }
         if (ACTION.equals(action) || Intent.ACTION_USER_PRESENT.equals(action)) {
             AppWidgetManager manager = AppWidgetManager.getInstance(context);
-            for (int id : manager.getAppWidgetIds(new ComponentName(context, QuoteWidgetProvider.class))) {
-                update(context, manager, id);
-            }
+            updateAsync(context, manager.getAppWidgetIds(
+                    new ComponentName(context, QuoteWidgetProvider.class)));
         }
+    }
+
+    /**
+     * 在线随机一言要联网，不能在主线程做；用 goAsync 把广播生命周期延长到更新完成。
+     */
+    private void updateAsync(Context context, int[] ids) {
+        final BroadcastReceiver.PendingResult pending = goAsync();
+        final int[] widgetIds = ids == null ? new int[0] : ids.clone();
+        new Thread(() -> {
+            try {
+                AppWidgetManager manager = AppWidgetManager.getInstance(context);
+                for (int id : widgetIds) update(context, manager, id);
+            } catch (Exception e) {
+                Log.w(TAG, "更新小组件失败", e);
+            } finally {
+                pending.finish();
+            }
+        }, "widget-update").start();
     }
 
     /**
@@ -85,24 +103,46 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     private void update(Context context, AppWidgetManager manager, int widgetId) {
         SharedPreferences prefs = context.getSharedPreferences("settings", 0);
         List<Quote> candidates = candidates(prefs);
-        if (candidates.isEmpty()) return;
 
-        boolean random = prefs.getBoolean("randomMode", true);
-        int index = random
-                ? new Random().nextInt(candidates.size())
-                : (prefs.getInt("quoteIndex", -1) + 1) % candidates.size();
-        Quote quote = candidates.get(index);
+        boolean onlineRandom = prefs.getBoolean("onlineRandom", false);
+        Quote quote = null;
+        int index = -1;
+
+        if (onlineRandom) {
+            // 「随机」是 App 自带的在线分类：取 Hitokoto，失败退缓存，再失败回本地语料
+            try {
+                quote = HitokotoClient.fetch();
+                HitokotoClient.cache(prefs, quote);
+                Log.i(TAG, "在线随机一言：" + quote.text);
+            } catch (Exception e) {
+                Log.w(TAG, "在线一言失败，用缓存：" + e.getMessage());
+                quote = HitokotoClient.cached(prefs);
+            }
+        }
+
+        if (quote == null) {
+            if (candidates.isEmpty()) return;
+            boolean random = prefs.getBoolean("randomMode", true);
+            index = random
+                    ? new Random().nextInt(candidates.size())
+                    : (prefs.getInt("quoteIndex", -1) + 1) % candidates.size();
+            quote = candidates.get(index);
+        }
+
         String meta = meta(quote);
 
         // lastQuote* 供自定义布局编辑器预览用
-        prefs.edit()
-                .putInt("quoteIndex", index)
+        SharedPreferences.Editor editor = prefs.edit()
                 .putString("lastLog", "已切换：" + quote.text + "（" + System.currentTimeMillis() + "）")
                 .putString("lastQuoteText", quote.text)
                 .putString("lastQuoteMeta", meta)
-                .putString("lastQuoteImage", quote.imagePath)
-                .apply();
-        Log.i(TAG, (random ? "随机" : "顺序") + "切换到第" + index + "条：" + quote.text);
+                .putString("lastQuoteImage", quote.imagePath);
+        if (index >= 0) editor.putInt("quoteIndex", index);
+        editor.apply();
+        if (index >= 0) {
+            Log.i(TAG, (prefs.getBoolean("randomMode", true) ? "随机" : "顺序")
+                    + "切换到第" + index + "条：" + quote.text);
+        }
 
         boolean night = (context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
