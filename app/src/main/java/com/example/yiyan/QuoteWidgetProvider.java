@@ -10,6 +10,7 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Bundle;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
@@ -63,10 +64,15 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 ? new Random().nextInt(candidates.size())
                 : (prefs.getInt("quoteIndex", -1) + 1) % candidates.size();
         Quote quote = candidates.get(index);
+        String meta = meta(quote);
 
+        // lastQuote* 供自定义布局编辑器预览用
         prefs.edit()
                 .putInt("quoteIndex", index)
                 .putString("lastLog", "已切换：" + quote.text + "（" + System.currentTimeMillis() + "）")
+                .putString("lastQuoteText", quote.text)
+                .putString("lastQuoteMeta", meta)
+                .putString("lastQuoteImage", quote.imagePath)
                 .apply();
         Log.i(TAG, (random ? "随机" : "顺序") + "切换到第" + index + "条：" + quote.text);
 
@@ -79,12 +85,17 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         if (night) accent = 0xffd0bcff;
         int background = night ? 0xff211f24 : prefs.getInt("backgroundColor", 0xfffff9f0);
 
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_quote);
+        boolean custom = prefs.getBoolean("customLayout", false);
+        RemoteViews views = new RemoteViews(context.getPackageName(),
+                custom ? R.layout.widget_quote_custom : R.layout.widget_quote);
         views.setTextViewText(R.id.quote_text, quote.text);
-        views.setTextViewText(R.id.quote_meta, meta(quote));
+        views.setTextViewText(R.id.quote_meta, meta);
         views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
                 prefs.getInt("fontSize", 16));
         boolean animated = applyImage(context, widgetId, views, quote, background);
+        if (custom) {
+            applyCustomLayout(context, manager, widgetId, views, prefs);
+        }
 
         views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);
         views.setTextColor(R.id.quote_meta, accent);
@@ -151,6 +162,43 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         views.setViewVisibility(R.id.quote_image, View.VISIBLE);
         views.setImageViewBitmap(R.id.quote_image, bitmap);
         return false;
+    }
+
+    /**
+     * 自定义布局：文字块与图片块按 0–1 的分数定位。
+     * RemoteViews 改不了 margin，所以用「包装容器 + padding」把 match_parent 的子视图
+     * 挤到目标位置——padding 会把子视图的可用区域缩小到目标矩形。
+     */
+    private void applyCustomLayout(Context context, AppWidgetManager manager, int widgetId,
+                                   RemoteViews views, SharedPreferences prefs) {
+        float density = context.getResources().getDisplayMetrics().density;
+        Bundle options = manager.getAppWidgetOptions(widgetId);
+        int widthDp = Math.max(120, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180));
+        int heightDp = Math.max(80, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110));
+        int inset = Math.round(14 * density);
+        int contentWidth = Math.max(1, Math.round(widthDp * density) - inset * 2);
+        int contentHeight = Math.max(1, Math.round(heightDp * density) - inset * 2);
+
+        int textLeft = clampPx(prefs.getFloat("textX", 0.06f) * contentWidth,
+                0, contentWidth - Math.round(60 * density));
+        int textTop = clampPx(prefs.getFloat("textY", 0.06f) * contentHeight,
+                0, contentHeight - Math.round(32 * density));
+        views.setViewPadding(R.id.text_wrap, textLeft, textTop, 0, 0);
+        views.setViewVisibility(R.id.text_box,
+                prefs.getBoolean("textBox", false) ? View.VISIBLE : View.GONE);
+
+        int imageSize = Math.round(78 * density);
+        int maxImageX = Math.max(0, contentWidth - imageSize);
+        int maxImageY = Math.max(0, contentHeight - imageSize);
+        int imageLeft = clampPx(prefs.getFloat("imageX", 0.58f) * contentWidth, 0, maxImageX);
+        int imageTop = clampPx(prefs.getFloat("imageY", 0.18f) * contentHeight, 0, maxImageY);
+        views.setViewPadding(R.id.image_wrap, imageLeft, imageTop,
+                Math.max(0, maxImageX - imageLeft), Math.max(0, maxImageY - imageTop));
+    }
+
+    private int clampPx(float value, int min, int max) {
+        int upper = Math.max(min, max);
+        return Math.max(min, Math.min(upper, Math.round(value)));
     }
 
     /**

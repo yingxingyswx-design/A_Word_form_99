@@ -31,8 +31,8 @@ public class QuoteImageWidgetService extends RemoteViewsService {
 
     private static final class FrameFactory implements RemoteViewsFactory {
 
-        /** 帧位图很小（<=240px），留几帧避免每次翻页都重新解码。 */
-        private static final int CACHE_SIZE = 6;
+        /** 帧位图很小（<=160px），整轮缓存下来避免每次翻页都重新解码。 */
+        private static final int CACHE_SIZE = 12;
 
         private final Context context;
         private final ArrayList<String> frames = new ArrayList<>();

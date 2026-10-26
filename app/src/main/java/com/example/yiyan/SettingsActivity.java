@@ -41,8 +41,27 @@ public class SettingsActivity extends Activity {
         bindMonet();
         bindThemeColor();
         bindAddQuote();
+        bindCustomLayout();
         bindRefreshAll();
         bindBottomNav();
+    }
+
+    private void bindCustomLayout() {
+        final Switch custom = findViewById(R.id.custom_layout);
+        custom.setChecked(prefs.getBoolean("customLayout", false));
+        custom.setOnCheckedChangeListener((button, checked) -> {
+            prefs.edit().putBoolean("customLayout", checked).apply();
+            sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
+            Toast.makeText(this, checked ? "已切换到自定义布局" : "已恢复默认排版",
+                    Toast.LENGTH_SHORT).show();
+        });
+        findViewById(R.id.edit_layout).setOnClickListener(v -> {
+            if (!prefs.getBoolean("customLayout", false)) {
+                prefs.edit().putBoolean("customLayout", true).apply();
+                custom.setChecked(true);
+            }
+            startActivity(new Intent(this, LayoutEditorActivity.class));
+        });
     }
 
     private void bindOrderMode() {

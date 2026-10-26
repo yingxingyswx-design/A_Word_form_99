@@ -39,12 +39,16 @@ final class ImageStore {
     private static final long MAX_BYTES = 16L * 1024 * 1024;
     /** 小组件单次 RemoteViews 有 Binder 体积限制，解码后的位图必须压到这个尺寸以内。 */
     static final int WIDGET_MAX_PX = 240;
-    /** 帧文件按最长边存这个尺寸，桌面再按需缩放。 */
-    static final int FRAME_MAX_PX = 180;
+    /**
+     * 帧文件按最长边存这个尺寸。小组件右侧图片按 78dp 显示，3x 屏也才 234px，
+     * 但每次翻页都要把位图跨 Binder 送一次，所以取 160px —— 肉眼几乎看不出差别，
+     * 单帧体积却从 230KB 降到约 100KB。
+     */
+    static final int FRAME_MAX_PX = 160;
     /** 桌面翻页间隔，必须和 widget_quote.xml 里的 android:flipInterval 保持一致。 */
     static final int FRAME_INTERVAL_MS = 200;
-    /** 帧数上限：帧越多，桌面每次翻页要搬运的位图越多。 */
-    static final int MAX_FRAMES = 20;
+    /** 帧数上限：20 帧 × 100KB 意味着 5fps 下每秒搬运 500KB，压到 12 帧更稳。 */
+    static final int MAX_FRAMES = 12;
 
     private ImageStore() {
     }
@@ -122,14 +126,23 @@ final class ImageStore {
     /** 删除配图本身、它的 meta 与所有帧文件。 */
     static void deleteWithFrames(Context context, String name) {
         if (name == null || name.trim().isEmpty()) return;
+        delete(context, name);
+        clearFrames(context, name);
+    }
+
+    /** 只删 meta 与帧文件，保留原图（重新拆帧前清场用）。 */
+    static void clearFrames(Context context, String name) {
+        if (name == null || name.trim().isEmpty()) return;
         File dir = dir(context);
         String base = baseName(name);
-        delete(context, name);
         File meta = new File(dir, base + ".meta");
         if (meta.isFile()) meta.delete();
-        for (String frame : frameFileNames(base, MAX_FRAMES)) {
-            File file = new File(dir, frame);
-            if (file.isFile()) file.delete();
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        String prefix = base + "_f";
+        for (File file : files) {
+            String fileName = file.getName();
+            if (fileName.startsWith(prefix) && fileName.endsWith(".png")) file.delete();
         }
     }
 
@@ -157,51 +170,75 @@ final class ImageStore {
 
         int duration = movie.duration();
         if (duration <= 0) duration = 900;
-        // 帧数与时长成比例，配合固定的翻页间隔让播放速度尽量接近原 GIF
-        int count = Math.min(MAX_FRAMES,
+        // 采样帧数与时长成比例，配合固定翻页间隔让播放速度尽量接近原 GIF
+        int samples = Math.min(MAX_FRAMES,
                 Math.max(2, Math.round((float) duration / FRAME_INTERVAL_MS)));
-        int interval = FRAME_INTERVAL_MS;
 
         String base = baseName(imageName);
         File dir = dir(context);
+        clearFrames(context, imageName);
+
         float scale = Math.min(1f, (float) FRAME_MAX_PX / Math.max(movie.width(), movie.height()));
         int width = Math.max(1, Math.round(movie.width() * scale));
         int height = Math.max(1, Math.round(movie.height() * scale));
 
-        for (int i = 0; i < count; i++) {
-            movie.setTime((int) ((long) duration * i / count));
-            Bitmap frame = null;
-            OutputStream out = null;
-            try {
-                frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        int saved = 0;
+        Bitmap previous = null;
+        try {
+            for (int i = 0; i < samples; i++) {
+                movie.setTime((int) ((long) duration * i / samples));
+                Bitmap frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(frame);
                 canvas.scale(scale, scale);
                 movie.draw(canvas, 0, 0);
-                out = new FileOutputStream(new File(dir, frameName(base, i)));
-                frame.compress(Bitmap.CompressFormat.PNG, 100, out);
-                out.flush();
-            } catch (Exception e) {
-                Log.w(TAG, "拆帧失败：" + imageName + " #" + i, e);
-                deleteWithFrames(context, imageName);
-                return 0;
-            } finally {
-                closeQuietly(out);
-                if (frame != null) frame.recycle();
+
+                // GIF 里常有连续重复帧（表情包尤其多），去重后既不丢画面也少搬一份位图
+                if (previous != null && previous.sameAs(frame)) {
+                    frame.recycle();
+                    continue;
+                }
+                if (previous != null) previous.recycle();
+                previous = frame;
+
+                OutputStream out = null;
+                try {
+                    out = new FileOutputStream(new File(dir, frameName(base, saved)));
+                    frame.compress(Bitmap.CompressFormat.PNG, 100, out);
+                    out.flush();
+                    saved++;
+                } finally {
+                    closeQuietly(out);
+                }
             }
+        } catch (Exception e) {
+            Log.w(TAG, "拆帧失败：" + imageName, e);
+            if (previous != null) {
+                previous.recycle();
+                previous = null;
+            }
+            clearFrames(context, imageName);
+            return 0;
+        } finally {
+            if (previous != null) previous.recycle();
+        }
+
+        if (saved < 2) {
+            clearFrames(context, imageName);
+            return 0;
         }
 
         FileWriter writer = null;
         try {
             writer = new FileWriter(new File(dir, base + ".meta"));
-            writer.write(count + "\n" + interval + "\n");
+            writer.write(saved + "\n" + FRAME_INTERVAL_MS + "\n");
         } catch (Exception e) {
             Log.w(TAG, "写 GIF 帧信息失败", e);
-            deleteWithFrames(context, imageName);
+            clearFrames(context, imageName);
             return 0;
         } finally {
             closeQuietly(writer);
         }
-        return count;
+        return saved;
     }
 
     /** @return {@code [帧数, 帧间隔毫秒]}；没有拆过帧时返回 {@code [0, 150]}。 */
