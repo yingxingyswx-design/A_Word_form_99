@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,6 +29,10 @@ public class LayoutEditorActivity extends ThemedActivity {
     private TextView hint;
     private SharedPreferences prefs;
     private CustomScene scene;
+    private boolean userResized;
+    private boolean sizeDetected;
+    private int detectedWidthDp;
+    private int detectedHeightDp;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -45,6 +50,8 @@ public class LayoutEditorActivity extends ThemedActivity {
                 prefs.getString("lastQuoteMeta", "— 孔子 · 《论语》 · 原文"));
         canvas.setListener(this::updateHint);
         reloadBitmaps();
+        // 进页面先尝试用无障碍缓存到的小组件矩形，把画布比例对齐桌面实际大小
+        applyDetectedWidgetSize(false);
         updateHint();
 
         MaterialSwitch boxSwitch = findViewById(R.id.sw_text_box);
@@ -67,6 +74,9 @@ public class LayoutEditorActivity extends ThemedActivity {
         findViewById(R.id.btn_width_plus).setOnClickListener(v -> resizeWidget(40, 0));
         findViewById(R.id.btn_height_minus).setOnClickListener(v -> resizeWidget(0, -20));
         findViewById(R.id.btn_height_plus).setOnClickListener(v -> resizeWidget(0, 20));
+        findViewById(R.id.btn_read_size).setOnClickListener(v -> {
+            if (!applyDetectedWidgetSize(true)) showAccessibilityHelp();
+        });
         findViewById(R.id.btn_reset).setOnClickListener(v -> {
             scene = CustomScene.defaults();
             canvas.setScene(scene);
@@ -187,10 +197,79 @@ public class LayoutEditorActivity extends ThemedActivity {
     }
 
     private void resizeWidget(int deltaWidth, int deltaHeight) {
+        userResized = true;
         scene.widthDp = Math.max(160, Math.min(900, scene.widthDp + deltaWidth));
         scene.heightDp = Math.max(100, Math.min(520, scene.heightDp + deltaHeight));
         canvas.invalidate();
         updateHint();
+    }
+
+    /**
+     * 无障碍服务会把桌面 AppWidgetHostView 的屏幕矩形存进 GlassAlign；
+     * 第一个候选是脚本当时正在显示的那一句所命中的小组件。
+     *
+     * @return 是否读到了尺寸
+     */
+    private boolean applyDetectedWidgetSize(boolean toast) {
+        if (!accessibilityEnabled()) {
+            if (toast) {
+                Toast.makeText(this, "请先开启 DailyLine 无障碍，再回桌面让服务扫描一次",
+                        Toast.LENGTH_LONG).show();
+            }
+            return false;
+        }
+        int screenW = prefs.getInt("widgetScreenW", 0);
+        int screenH = prefs.getInt("widgetScreenH", 0);
+        long detectedAt = prefs.getLong("widgetSizeAt", 0);
+        if (screenW <= 0 || screenH <= 0 || detectedAt <= 0
+                || System.currentTimeMillis() - detectedAt > 30L * 60L * 1000L) {
+            if (toast) {
+                Toast.makeText(this,
+                        "还没读到最新的 DailyLine 组件尺寸，请回到放着组件的那一页再回来",
+                        Toast.LENGTH_LONG).show();
+            }
+            return false;
+        }
+        float density = getResources().getDisplayMetrics().density;
+        int width = Math.max(120, Math.min(900, Math.round(screenW / density)));
+        int height = Math.max(80, Math.min(520, Math.round(screenH / density)));
+        sizeDetected = true;
+        detectedWidthDp = width;
+        detectedHeightDp = height;
+        if (scene.widthDp != width || scene.heightDp != height) {
+            scene.widthDp = width;
+            scene.heightDp = height;
+            canvas.invalidate();
+        }
+        updateHint();
+        if (toast) {
+            Toast.makeText(this, "已读取桌面组件：" + width + "×" + height + "dp",
+                    Toast.LENGTH_SHORT).show();
+        }
+        return true;
+    }
+
+    private boolean accessibilityEnabled() {
+        String enabled = Settings.Secure.getString(getContentResolver(),
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        return enabled != null && enabled.contains(getPackageName());
+    }
+
+    private void showAccessibilityHelp() {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("读取桌面组件大小")
+                .setMessage("需要开启 DailyLine 的无障碍服务：开启后回到桌面让服务扫描一次，"
+                        + "再回到这里即可自动读取组件实际宽高。\n\n"
+                        + "无障碍只读取 AppWidgetHostView 的屏幕坐标，不读取文字，也不监听输入。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("去开启", (dialog, which) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    } catch (Exception e) {
+                        Toast.makeText(this, "打不开无障碍设置", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
     }
 
     private void reloadBitmaps() {
@@ -228,8 +307,12 @@ public class LayoutEditorActivity extends ThemedActivity {
         } else {
             selected = "未选中";
         }
-        hint.setText("小组件 " + scene.widthDp + "×" + scene.heightDp + "dp · "
-                + scene.images.size() + "/" + MAX_IMAGES + " 张图片 · " + selected
+        String size = "画布 " + scene.widthDp + "×" + scene.heightDp + "dp";
+        if (sizeDetected) {
+            size += " · 桌面实测 " + detectedWidthDp + "×" + detectedHeightDp + "dp";
+        }
+        hint.setText(size + " · " + scene.images.size() + "/" + MAX_IMAGES
+                + " 张图片 · " + selected
                 + "\n拖动移动，拖右下角改大小，拖右上角圆点任意角度旋转；框之间可以重叠"
                 + "\n「旋转」每按一次 +" + Math.round(ROTATE_STEP) + "°，长按归零");
     }
@@ -237,7 +320,10 @@ public class LayoutEditorActivity extends ThemedActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (canvas != null) updateHint();
+        if (canvas != null) {
+            if (!userResized) applyDetectedWidgetSize(false);
+            updateHint();
+        }
     }
 
     private void save() {

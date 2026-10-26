@@ -130,6 +130,14 @@
             android:text="高 +" />
     </LinearLayout>
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_read_size"
+        style="@style/Widget.Yiyan.Button.Tonal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="读取桌面组件大小（无障碍）" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -66,6 +66,7 @@ public class WidgetLocatorService extends AccessibilityService {
     /** 真正读一次桌面视图树：找到所有 AppWidgetHostView，再用小组件里那句话认领我们那个。 */
     private void scanNow() {
         List<Rect> hosts = new ArrayList<>();
+        List<Rect> ours = new ArrayList<>();
         List<Rect> texts = new ArrayList<>();
         String quote = getSharedPreferences("settings", 0).getString("lastQuoteText", "");
         String prefix = quote == null ? "" : quote.trim();
@@ -75,7 +76,7 @@ public class WidgetLocatorService extends AccessibilityService {
         AccessibilityNodeInfo active = getRootInActiveWindow();
         if (active != null) {
             try {
-                collect(active, hosts, texts, prefix, 0);
+                collect(active, hosts, ours, texts, prefix, null, 0);
             } catch (Exception e) {
                 Log.w(TAG, "读取小组件位置失败：" + e);
             }
@@ -85,7 +86,7 @@ public class WidgetLocatorService extends AccessibilityService {
                 for (android.view.accessibility.AccessibilityWindowInfo window : getWindows()) {
                     AccessibilityNodeInfo root = window.getRoot();
                     if (root == null) continue;
-                    collect(root, hosts, texts, prefix, 0);
+                    collect(root, hosts, ours, texts, prefix, null, 0);
                     if (!hosts.isEmpty()) break;
                 }
             } catch (Exception e) {
@@ -93,35 +94,61 @@ public class WidgetLocatorService extends AccessibilityService {
             }
         }
         if (!hosts.isEmpty()) {
-            // 同尺寸的小组件不止一个（都是 4x2），只靠尺寸会挑错；
-            // 用小组件里正在显示的那句话定位，才认得出是哪一个。
-            Rect matched = null;
-            for (Rect text : texts) {
-                int cx = (text.left + text.right) / 2;
-                int cy = (text.top + text.bottom) / 2;
-                for (Rect host : hosts) {
-                    if (host.contains(cx, cy)) {
-                        matched = host;
-                        break;
+            // 桌面常有多个 AppWidgetHostView（屏幕时间、日历……）。优先用 RemoteViews 子节点
+            // 的 package 认出自己：我们的 child package 是 com.example.yiyan，尺寸不会因为
+            // 当前句子变了、文字被裁切或旋转而失配。
+            List<Rect> ordered = new ArrayList<>();
+            for (Rect rect : ours) {
+                if (!ordered.contains(rect)) ordered.add(rect);
+            }
+            // 老 launcher 不一定暴露 child package，再退回到“当前句子命中的 host”
+            if (ordered.isEmpty()) {
+                for (Rect text : texts) {
+                    int cx = (text.left + text.right) / 2;
+                    int cy = (text.top + text.bottom) / 2;
+                    for (Rect host : hosts) {
+                        if (host.contains(cx, cy) && !ordered.contains(host)) {
+                            ordered.add(host);
+                            break;
+                        }
                     }
                 }
-                if (matched != null) break;
             }
-            List<Rect> ordered = new ArrayList<>();
-            if (matched != null) ordered.add(matched);
             for (Rect host : hosts) {
-                if (matched == null || !host.equals(matched)) ordered.add(host);
+                if (!ordered.contains(host)) ordered.add(host);
             }
             GlassAlign.storeCandidates(this, ordered);
-            Log.i(TAG, "无障碍扫描：找到 " + hosts.size() + " 个小组件，文字命中 "
-                    + texts.size() + "，选中 " + ordered.get(0));
+            // 单独记录「确认属于 DailyLine」的尺寸，供自定义布局编辑器使用。
+            // 如果当前桌面页只有别的组件，ours 为空，绝不能拿屏幕时间 / 日历的尺寸顶替。
+            Rect own = !ours.isEmpty() ? ours.get(0) : confidentByText(texts, hosts);
+            if (own != null) {
+                getSharedPreferences("settings", 0).edit()
+                        .putInt("widgetScreenW", own.width())
+                        .putInt("widgetScreenH", own.height())
+                        .putLong("widgetSizeAt", System.currentTimeMillis())
+                        .apply();
+            }
+            Log.i(TAG, "无障碍扫描：找到 " + hosts.size() + " 个小组件，自身 package 命中 "
+                    + ours.size() + "，文字命中 " + texts.size() + "，选中 " + ordered.get(0)
+                    + (own == null ? "，未确认到自身尺寸" : "，自身尺寸 " + own.width() + "x" + own.height()));
         } else {
             Log.i(TAG, "无障碍扫描：当前窗口没有 AppWidgetHostView");
         }
     }
 
-    private void collect(AccessibilityNodeInfo node, List<Rect> out, List<Rect> texts,
-                         String quotePrefix, int depth) {
+    private Rect confidentByText(List<Rect> texts, List<Rect> hosts) {
+        for (Rect text : texts) {
+            int cx = (text.left + text.right) / 2;
+            int cy = (text.top + text.bottom) / 2;
+            for (Rect host : hosts) {
+                if (host.contains(cx, cy)) return host;
+            }
+        }
+        return null;
+    }
+
+    private void collect(AccessibilityNodeInfo node, List<Rect> out, List<Rect> ours,
+                         List<Rect> texts, String quotePrefix, Rect currentHost, int depth) {
         if (node == null || depth > 40 || out.size() >= 12) return;
 
         CharSequence text = node.getText();
@@ -139,18 +166,26 @@ public class WidgetLocatorService extends AccessibilityService {
             String id = node.getViewIdResourceName();
             isHost = id != null && id.contains("app_widget");
         }
+
+        Rect host = currentHost;
         if (isHost) {
             Rect bounds = new Rect();
             node.getBoundsInScreen(bounds);
             if (bounds.width() > 120 && bounds.height() > 80
                     && bounds.right <= 2000 && bounds.bottom <= 4000) {
                 out.add(bounds);
-                return;
+                host = bounds;
             }
         }
 
+        CharSequence packageName = node.getPackageName();
+        if (host != null && packageName != null
+                && getPackageName().contentEquals(packageName)) {
+            if (!ours.contains(host)) ours.add(host);
+        }
+
         for (int i = 0; i < node.getChildCount(); i++) {
-            collect(node.getChild(i), out, texts, quotePrefix, depth + 1);
+            collect(node.getChild(i), out, ours, texts, quotePrefix, host, depth + 1);
         }
     }
 
