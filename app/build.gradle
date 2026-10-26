@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 android { namespace 'com.example.yiyan'; compileSdk 34
-    defaultConfig { applicationId 'com.example.yiyan'; minSdk 24; targetSdk 35; versionCode 28; versionName '3.12' }
+    defaultConfig { applicationId 'com.example.yiyan'; minSdk 24; targetSdk 35; versionCode 29; versionName '3.13' }
     buildFeatures { viewBinding true; buildConfig true }
     dependencies {
         implementation 'com.google.android.material:material:1.12.0'

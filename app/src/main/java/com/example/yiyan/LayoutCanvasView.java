@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.text.Layout;
 import android.text.StaticLayout;
@@ -15,8 +16,8 @@ import android.view.MotionEvent;
 import android.view.View;
 
 /**
- * 自定义布局画布：文字框 + 多个图片框，可拖动、可拖右下角改大小，
- * 且框之间不允许重叠（移动/缩放时若相交就放弃这次位移）。
+ * 自定义布局画布：文字框 + 多个图片框，可拖动、可拖右下角改大小、可拖右上角圆点任意角度旋转。
+ * 框与框之间允许重叠：文字画在最下面，图片按列表顺序往上叠。
  *
  * 几何一律用「相对内容区的 0–1 分数」表达，保存后小组件按自己的实际尺寸还原。
  */
@@ -29,8 +30,14 @@ public class LayoutCanvasView extends View {
     private static final int MODE_NONE = 0;
     private static final int MODE_MOVE = 1;
     private static final int MODE_RESIZE = 2;
+    private static final int MODE_ROTATE = 3;
+
     private static final float MIN_SIZE = 0.08f;
-    private static final float GAP = 0.004f;
+    private static final float MAX_SIZE = 2.5f;
+
+    /** 旋转手柄的视觉半径 / 触摸半径。手柄放在框的右上角。 */
+    private static final float HANDLE_RADIUS_DP = 7f;
+    private static final float HANDLE_TOUCH_DP = 24f;
 
     private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint metaPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -44,7 +51,6 @@ public class LayoutCanvasView extends View {
 
     private final RectF widgetRect = new RectF();
     private final RectF contentRect = new RectF();
-    private final RectF tempRect = new RectF();
 
     private CustomScene scene = CustomScene.defaults();
     private final Bitmap[] bitmaps = new Bitmap[4];
@@ -57,12 +63,21 @@ public class LayoutCanvasView extends View {
 
     private float downX, downY;
     private RectF dragOrigin;
+    private float startAngle;
+    private float startRotation;
+
+    private Listener listener;
 
     /** 玻璃背景缓存：尺寸或参数变了才重渲染。 */
     private Bitmap glassBitmap;
     private int glassWidth;
     private int glassHeight;
     private String glassSignature;
+
+    public interface Listener {
+        /** 选中项或旋转角度发生变化，供编辑器刷新提示文字。 */
+        void onSceneChanged();
+    }
 
     public LayoutCanvasView(Context context) {
         this(context, null);
@@ -92,7 +107,7 @@ public class LayoutCanvasView extends View {
         handleStrokePaint.setStrokeWidth(dp(2));
         handleStrokePaint.setColor(0xFFFFFFFF);
 
-        setPadding((int) dp(12), (int) dp(12), (int) dp(12), (int) dp(12));
+        setPadding((int) dp(12), (int) dp(12), (int) dp(16), (int) dp(16));
     }
 
     void setScene(CustomScene scene) {
@@ -116,6 +131,10 @@ public class LayoutCanvasView extends View {
         invalidate();
     }
 
+    void setListener(Listener listener) {
+        this.listener = listener;
+    }
+
     int getSelectedType() {
         return selectedType;
     }
@@ -128,6 +147,7 @@ public class LayoutCanvasView extends View {
         selectedType = TYPE_NONE;
         selectedIndex = -1;
         invalidate();
+        notifyChanged();
     }
 
     // ---- 绘制 ----
@@ -203,23 +223,27 @@ public class LayoutCanvasView extends View {
     }
 
     private void drawText(Canvas canvas) {
-        float left = contentRect.left + scene.text.x * contentRect.width();
-        float top = contentRect.top + scene.text.y * contentRect.height();
-        float width = Math.max(dp(24), scene.text.w * contentRect.width());
-        float height = Math.max(dp(20), scene.text.h * contentRect.height());
-        tempRect.set(left, top, left + width, top + height);
-
-        if (scene.textBox) {
-            canvas.drawRoundRect(tempRect, dp(10), dp(10), boxFillPaint);
-            canvas.drawRoundRect(tempRect, dp(10), dp(10), borderPaint);
-        }
+        CustomScene.Box box = scene.text;
+        RectF rect = boxRect(box);
 
         canvas.save();
-        canvas.clipRect(tempRect);
+        canvas.rotate(box.rotation, rect.centerX(), rect.centerY());
+
+        if (scene.textBox) {
+            // 文字框是透明底，只画描边，和桌面上的效果一致
+            canvas.drawRoundRect(rect, dp(10), dp(10), borderPaint);
+        }
+
+        float width = Math.max(dp(24), rect.width());
+        float height = Math.max(dp(20), rect.height());
+        rect.set(rect.left, rect.top, rect.left + width, rect.top + height);
+
+        canvas.save();
+        canvas.clipRect(rect);
         int available = Math.max(1, (int) width);
         StaticLayout body = buildLayout(quoteText, textPaint, available);
         float bodyHeight = Math.min(body.getHeight(), Math.max(0, height - dp(16)));
-        canvas.translate(left, top);
+        canvas.translate(rect.left, rect.top);
         canvas.save();
         canvas.clipRect(0, 0, available, bodyHeight);
         body.draw(canvas);
@@ -233,55 +257,63 @@ public class LayoutCanvasView extends View {
         canvas.restore();
         canvas.restore();
 
-        canvas.drawRoundRect(tempRect, dp(6), dp(6), dashedPaint);
+        canvas.drawRoundRect(rect, dp(6), dp(6), dashedPaint);
+        canvas.restore();
     }
 
     private void drawImage(Canvas canvas, int index) {
         CustomScene.ImageBox box = scene.images.get(index);
-        float left = contentRect.left + box.x * contentRect.width();
-        float top = contentRect.top + box.y * contentRect.height();
-        float width = Math.max(dp(24), box.w * contentRect.width());
-        float height = Math.max(dp(24), box.h * contentRect.height());
-        tempRect.set(left, top, left + width, top + height);
+        RectF rect = boxRect(box);
+
+        canvas.save();
+        canvas.rotate(box.rotation, rect.centerX(), rect.centerY());
 
         Bitmap bitmap = index < bitmaps.length ? bitmaps[index] : null;
         if (bitmap != null && !bitmap.isRecycled()) {
-            drawCenterCrop(canvas, bitmap, tempRect);
+            drawCenterCrop(canvas, bitmap, rect);
         } else {
-            canvas.drawRect(tempRect, boxFillPaint);
+            canvas.drawRect(rect, boxFillPaint);
             Paint label = new Paint(Paint.ANTI_ALIAS_FLAG);
             label.setColor(0xAA6750A4);
             label.setTextSize(dp(12));
             label.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText("图片 " + (index + 1), tempRect.centerX(),
-                    tempRect.centerY() + dp(4), label);
+            canvas.drawText("图片 " + (index + 1), rect.centerX(),
+                    rect.centerY() + dp(4), label);
         }
-        canvas.drawRect(tempRect, dashedPaint);
+        canvas.drawRect(rect, dashedPaint);
+        canvas.restore();
     }
 
     private void drawSelection(Canvas canvas) {
-        RectF rect = selectionRect();
-        if (rect == null) return;
+        CustomScene.Box box = selectedBox();
+        if (box == null) return;
+        RectF rect = boxRect(box);
+
         Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
         outline.setStyle(Paint.Style.STROKE);
         outline.setStrokeWidth(dp(2));
         outline.setColor(0xFF6750A4);
+
+        canvas.save();
+        canvas.rotate(box.rotation, rect.centerX(), rect.centerY());
         canvas.drawRect(rect, outline);
 
-        float handle = dp(14);
-        RectF corner = new RectF(rect.right - handle / 2, rect.bottom - handle / 2,
-                rect.right + handle / 2, rect.bottom + handle / 2);
-        canvas.drawRect(corner, handlePaint);
-        canvas.drawRect(corner, handleStrokePaint);
+        float radius = dp(HANDLE_RADIUS_DP);
+        canvas.drawCircle(rect.right, rect.bottom, radius, handlePaint);
+        canvas.drawCircle(rect.right, rect.bottom, radius, handleStrokePaint);
+        canvas.restore();
+
+        // 右上角是旋转手柄：位置跟着框一起转，任何角度都够得到
+        float[] handle = rotateHandlePoint(rect, box.rotation);
+        canvas.drawCircle(handle[0], handle[1], radius, handlePaint);
+        canvas.drawCircle(handle[0], handle[1], radius, handleStrokePaint);
     }
 
-    private RectF selectionRect() {
-        if (selectedType == TYPE_TEXT) {
-            return boxRect(scene.text);
-        }
+    private CustomScene.Box selectedBox() {
+        if (selectedType == TYPE_TEXT) return scene.text;
         if (selectedType == TYPE_IMAGE
                 && selectedIndex >= 0 && selectedIndex < scene.images.size()) {
-            return boxRect(scene.images.get(selectedIndex));
+            return scene.images.get(selectedIndex);
         }
         return null;
     }
@@ -301,7 +333,7 @@ public class LayoutCanvasView extends View {
         float sourceHeight = destination.height() / scale;
         float sourceLeft = (bitmap.getWidth() - sourceWidth) / 2f;
         float sourceTop = (bitmap.getHeight() - sourceHeight) / 2f;
-        android.graphics.Rect source = new android.graphics.Rect(
+        Rect source = new Rect(
                 Math.round(sourceLeft), Math.round(sourceTop),
                 Math.round(sourceLeft + sourceWidth), Math.round(sourceTop + sourceHeight));
         canvas.drawBitmap(bitmap, source, destination, imagePaint);
@@ -327,6 +359,7 @@ public class LayoutCanvasView extends View {
             case MotionEvent.ACTION_CANCEL:
                 mode = MODE_NONE;
                 dragOrigin = null;
+                notifyChanged();
                 return true;
             default:
                 return super.onTouchEvent(event);
@@ -338,30 +371,46 @@ public class LayoutCanvasView extends View {
         downY = event.getY();
         computeContentRect();
 
-        RectF handle = selectionRect();
-        if (handle != null && withinHandle(handle, downX, downY)) {
-            mode = MODE_RESIZE;
-            dragOrigin = new RectF(handle);
-            return true;
-        }
-
-        // 图片优先命中（后添加的在上层）
-        for (int i = scene.images.size() - 1; i >= 0; i--) {
-            if (boxRect(scene.images.get(i)).contains(downX, downY)) {
-                selectedType = TYPE_IMAGE;
-                selectedIndex = i;
-                mode = MODE_MOVE;
-                dragOrigin = new RectF(boxRect(scene.images.get(i)));
-                invalidate();
+        // 已选中时，先给旋转 / 缩放手柄最高的命中优先级
+        CustomScene.Box current = selectedBox();
+        if (current != null) {
+            RectF rect = boxRect(current);
+            float[] handle = rotateHandlePoint(rect, current.rotation);
+            if (distance(downX, downY, handle[0], handle[1]) <= dp(HANDLE_TOUCH_DP)) {
+                mode = MODE_ROTATE;
+                dragOrigin = new RectF(rect);
+                startRotation = current.rotation;
+                startAngle = angleFromCenter(rect, downX, downY);
+                return true;
+            }
+            float[] corner = rotatedPoint(rect.right, rect.bottom, rect, current.rotation);
+            if (distance(downX, downY, corner[0], corner[1]) <= dp(HANDLE_TOUCH_DP)) {
+                mode = MODE_RESIZE;
+                dragOrigin = new RectF(rect);
                 return true;
             }
         }
-        if (boxRect(scene.text).contains(downX, downY)) {
+
+        // 图片优先命中（后添加的在上层），文字在最底层
+        for (int i = scene.images.size() - 1; i >= 0; i--) {
+            CustomScene.ImageBox box = scene.images.get(i);
+            if (insideBox(box, downX, downY)) {
+                selectedType = TYPE_IMAGE;
+                selectedIndex = i;
+                mode = MODE_MOVE;
+                dragOrigin = new RectF(boxRect(box));
+                invalidate();
+                notifyChanged();
+                return true;
+            }
+        }
+        if (insideBox(scene.text, downX, downY)) {
             selectedType = TYPE_TEXT;
             selectedIndex = -1;
             mode = MODE_MOVE;
             dragOrigin = new RectF(boxRect(scene.text));
             invalidate();
+            notifyChanged();
             return true;
         }
         clearSelection();
@@ -370,49 +419,53 @@ public class LayoutCanvasView extends View {
 
     private boolean onMove(MotionEvent event) {
         if (mode == MODE_NONE || dragOrigin == null) return true;
+        CustomScene.Box target = selectedBox();
+        if (target == null) return true;
+
         float dx = event.getX() - downX;
         float dy = event.getY() - downY;
 
-        CustomScene.Box target = selectedType == TYPE_TEXT
-                ? scene.text
-                : (selectedIndex >= 0 && selectedIndex < scene.images.size()
-                ? scene.images.get(selectedIndex) : null);
-        if (target == null) return true;
-
-        float fx = dx / Math.max(1, contentRect.width());
-        float fy = dy / Math.max(1, contentRect.height());
-
-        CustomScene.Box candidate = target.copy();
         if (mode == MODE_MOVE) {
+            float fx = dx / Math.max(1f, contentRect.width());
+            float fy = dy / Math.max(1f, contentRect.height());
+
+            CustomScene.Box candidate = target.copy();
             candidate.x = (dragOrigin.left - contentRect.left) / contentRect.width() + fx;
             candidate.y = (dragOrigin.top - contentRect.top) / contentRect.height() + fy;
             clampInside(candidate);
-        } else {
-            candidate.w = dragOrigin.width() / contentRect.width() + fx;
-            candidate.h = dragOrigin.height() / contentRect.height() + fy;
-            candidate.w = Math.max(MIN_SIZE, Math.min(candidate.w, 1f - candidate.x));
-            candidate.h = Math.max(MIN_SIZE, Math.min(candidate.h, 1f - candidate.y));
-        }
-
-        // 相交就整体放弃这次位移：文字框与图片框都是实体，不允许叠在一起
-        if (!overlapsOthers(candidate, target)) {
             target.x = candidate.x;
             target.y = candidate.y;
-            target.w = candidate.w;
-            target.h = candidate.h;
+
             downX = event.getX();
             downY = event.getY();
             dragOrigin.set(boxRect(target));
             invalidate();
+            return true;
+        }
+
+        if (mode == MODE_RESIZE) {
+            // 把屏幕上的拖动量换算回框自身的坐标系，旋转后拖右下角仍然跟着手指走
+            double rad = Math.toRadians(-target.rotation);
+            float localX = (float) (dx * Math.cos(rad) - dy * Math.sin(rad));
+            float localY = (float) (dx * Math.sin(rad) + dy * Math.cos(rad));
+            float width = dragOrigin.width() / Math.max(1f, contentRect.width());
+            float height = dragOrigin.height() / Math.max(1f, contentRect.height());
+            target.w = clampSize(width + localX / Math.max(1f, contentRect.width()));
+            target.h = clampSize(height + localY / Math.max(1f, contentRect.height()));
+            invalidate();
+            return true;
+        }
+
+        if (mode == MODE_ROTATE) {
+            float angle = angleFromCenter(dragOrigin, event.getX(), event.getY());
+            float delta = angle - startAngle;
+            while (delta > 180f) delta -= 360f;
+            while (delta < -180f) delta += 360f;
+            target.rotation = CustomScene.normalizeRotation(startRotation + delta);
+            invalidate();
+            return true;
         }
         return true;
-    }
-
-    private boolean overlapsOthers(CustomScene.Box candidate, CustomScene.Box self) {
-        for (CustomScene.ImageBox box : scene.images) {
-            if (box != self && candidate.intersects(box, GAP)) return true;
-        }
-        return self != scene.text && candidate.intersects(scene.text, GAP);
     }
 
     private void clampInside(CustomScene.Box box) {
@@ -420,10 +473,58 @@ public class LayoutCanvasView extends View {
         box.y = Math.max(0f, Math.min(box.y, 1f - box.h));
     }
 
-    private boolean withinHandle(RectF rect, float x, float y) {
-        float size = dp(22);
-        return x >= rect.right - size && x <= rect.right + size
-                && y >= rect.bottom - size && y <= rect.bottom + size;
+    private float clampSize(float value) {
+        return Math.max(MIN_SIZE, Math.min(MAX_SIZE, value));
+    }
+
+    private boolean insideBox(CustomScene.Box box, float x, float y) {
+        RectF rect = boxRect(box);
+        float[] local = toLocal(rect, box.rotation, x, y);
+        return Math.abs(local[0]) <= rect.width() / 2f
+                && Math.abs(local[1]) <= rect.height() / 2f;
+    }
+
+    /** 屏幕坐标 -> 以框中心为原点、随框旋转的局部坐标。 */
+    private float[] toLocal(RectF rect, float rotation, float x, float y) {
+        double rad = Math.toRadians(-rotation);
+        float dx = x - rect.centerX();
+        float dy = y - rect.centerY();
+        return new float[]{
+                (float) (dx * Math.cos(rad) - dy * Math.sin(rad)),
+                (float) (dx * Math.sin(rad) + dy * Math.cos(rad))
+        };
+    }
+
+    /** 局部坐标 -> 屏幕坐标。 */
+    private float[] rotatedPoint(float px, float py, RectF rect, float rotation) {
+        double rad = Math.toRadians(rotation);
+        float dx = px - rect.centerX();
+        float dy = py - rect.centerY();
+        return new float[]{
+                rect.centerX() + (float) (dx * Math.cos(rad) - dy * Math.sin(rad)),
+                rect.centerY() + (float) (dx * Math.sin(rad) + dy * Math.cos(rad))
+        };
+    }
+
+    /** 旋转手柄 = 框的右上角，随框一起旋转；只有整个点跑出画布时才拉回来。 */
+    private float[] rotateHandlePoint(RectF rect, float rotation) {
+        float[] point = rotatedPoint(rect.right, rect.top, rect, rotation);
+        float margin = dp(10);
+        point[0] = Math.max(margin, Math.min(getWidth() - margin, point[0]));
+        point[1] = Math.max(margin, Math.min(getHeight() - margin, point[1]));
+        return point;
+    }
+
+    private float angleFromCenter(RectF rect, float x, float y) {
+        return (float) Math.toDegrees(Math.atan2(y - rect.centerY(), x - rect.centerX()));
+    }
+
+    private float distance(float x1, float y1, float x2, float y2) {
+        return (float) Math.hypot(x1 - x2, y1 - y2);
+    }
+
+    private void notifyChanged() {
+        if (listener != null) listener.onSceneChanged();
     }
 
     private float dp(float value) {

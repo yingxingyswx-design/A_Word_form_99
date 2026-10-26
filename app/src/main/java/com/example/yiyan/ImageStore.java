@@ -317,23 +317,21 @@ final class ImageStore {
         }
     }
 
-    /** 解码并按旋转 / 镜像变换（旋转 90/180/270 时宽高对调）。 */
-    static Bitmap decodeTransformed(Context context, String name, int maxPx,
-                                    int rotation, boolean flipH, boolean flipV) {
+    /** 解码并应用水平 / 垂直镜像。旋转现在由画布和小组件视图各自完成，不再烘焙进位图。 */
+    static Bitmap decodeFlipped(Context context, String name, int maxPx,
+                                boolean flipH, boolean flipV) {
         Bitmap source = decode(context, name, maxPx);
         if (source == null) return null;
-        int normalized = ((rotation % 360) + 360) % 360;
-        if (normalized == 0 && !flipH && !flipV) return source;
+        if (!flipH && !flipV) return source;
         try {
             Matrix matrix = new Matrix();
             matrix.postScale(flipH ? -1f : 1f, flipV ? -1f : 1f);
-            matrix.postRotate(normalized);
             Bitmap transformed = Bitmap.createBitmap(source, 0, 0,
                     source.getWidth(), source.getHeight(), matrix, true);
             if (transformed != source) source.recycle();
             return transformed;
         } catch (Exception e) {
-            Log.w(TAG, "变换配图失败：" + name, e);
+            Log.w(TAG, "镜像配图失败：" + name, e);
             return source;
         }
     }

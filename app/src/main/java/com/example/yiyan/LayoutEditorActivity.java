@@ -13,14 +13,16 @@ import android.widget.Toast;
 /**
  * 自定义布局编辑器。
  *
- * 画布上拖框体移动、拖右下角改大小；文字与图片框是实体，相交时这次位移会被丢弃。
- * 图片支持多个（上限 4 个）、删除、旋转 90°、水平/垂直镜像。
+ * 画布上拖框体移动、拖右下角改大小、拖右上角圆点任意角度旋转；文字框与图片框可以任意重叠。
+ * 图片支持多个（上限 4 个）、删除、水平/垂直镜像。
  * 小组件尺寸用「宽 +/− / 高 +/−」调整，编辑器会把画布按同样的宽高比显示。
  */
 public class LayoutEditorActivity extends AppCompatActivity {
 
     private static final int REQUEST_PICK_IMAGE = 4301;
     private static final int MAX_IMAGES = 4;
+    /** 「旋转」按钮每次微调多少度；按住可以归零。 */
+    private static final float ROTATE_STEP = 1f;
 
     private LayoutCanvasView canvas;
     private TextView hint;
@@ -41,6 +43,7 @@ public class LayoutEditorActivity extends AppCompatActivity {
         canvas.setScene(scene);
         canvas.setContent(prefs.getString("lastQuoteText", "知者不惑。"),
                 prefs.getString("lastQuoteMeta", "— 孔子 · 《论语》 · 原文"));
+        canvas.setListener(this::updateHint);
         reloadBitmaps();
         updateHint();
 
@@ -53,9 +56,13 @@ public class LayoutEditorActivity extends AppCompatActivity {
 
         findViewById(R.id.btn_add_image).setOnClickListener(v -> pickImage());
         findViewById(R.id.btn_delete).setOnClickListener(v -> deleteSelected());
-        findViewById(R.id.btn_rotate).setOnClickListener(v -> transformSelected(1, 0));
-        findViewById(R.id.btn_flip_h).setOnClickListener(v -> transformSelected(0, 1));
-        findViewById(R.id.btn_flip_v).setOnClickListener(v -> transformSelected(0, 2));
+        findViewById(R.id.btn_rotate).setOnClickListener(v -> rotateSelected(ROTATE_STEP));
+        findViewById(R.id.btn_rotate).setOnLongClickListener(v -> {
+            resetSelectedRotation();
+            return true;
+        });
+        findViewById(R.id.btn_flip_h).setOnClickListener(v -> flipSelected(true));
+        findViewById(R.id.btn_flip_v).setOnClickListener(v -> flipSelected(false));
         findViewById(R.id.btn_width_minus).setOnClickListener(v -> resizeWidget(-40, 0));
         findViewById(R.id.btn_width_plus).setOnClickListener(v -> resizeWidget(40, 0));
         findViewById(R.id.btn_height_minus).setOnClickListener(v -> resizeWidget(0, -20));
@@ -64,6 +71,7 @@ public class LayoutEditorActivity extends AppCompatActivity {
             scene = CustomScene.defaults();
             canvas.setScene(scene);
             canvas.clearSelection();
+            boxSwitch.setChecked(scene.textBox);
             reloadBitmaps();
             updateHint();
         });
@@ -106,36 +114,17 @@ public class LayoutEditorActivity extends AppCompatActivity {
             }
         }
 
-        CustomScene.ImageBox box = new CustomScene.ImageBox(0.55f, 0.15f, 0.22f,
+        CustomScene.ImageBox box = new CustomScene.ImageBox(0f, 0f, 0.22f,
                 Math.min(0.9f, 0.22f * scene.widthDp / Math.max(1, scene.heightDp)));
+        // 依次错开叠放，允许压住文字或别的图片
+        int count = scene.images.size();
+        box.x = Math.max(0f, Math.min(1f - box.w, 0.55f + count * 0.04f));
+        box.y = Math.max(0f, Math.min(1f - box.h, 0.14f + count * 0.06f));
         box.name = name;
-        placeFree(box);
         scene.images.add(box);
         canvas.setScene(scene);
         reloadBitmaps();
         updateHint();
-    }
-
-    /** 网格扫描找一个不与现有框相交的位置；实在没空位就贴着右下角放。 */
-    private void placeFree(CustomScene.ImageBox box) {
-        for (float y = 0.02f; y < 0.95f; y += 0.06f) {
-            for (float x = 0.02f; x < 0.95f; x += 0.05f) {
-                if (x + box.w > 1f || y + box.h > 1f) continue;
-                box.x = x;
-                box.y = y;
-                if (!overlapsAny(box)) return;
-            }
-        }
-        box.x = Math.max(0f, 1f - box.w - 0.02f);
-        box.y = Math.max(0f, 1f - box.h - 0.02f);
-    }
-
-    private boolean overlapsAny(CustomScene.Box candidate) {
-        if (candidate.intersects(scene.text, 0.004f)) return true;
-        for (CustomScene.ImageBox box : scene.images) {
-            if (candidate.intersects(box, 0.004f)) return true;
-        }
-        return false;
     }
 
     private void deleteSelected() {
@@ -153,8 +142,29 @@ public class LayoutEditorActivity extends AppCompatActivity {
         updateHint();
     }
 
-    /** kind: 1=旋转 90°，2=水平镜像，3=垂直镜像。 */
-    private void transformSelected(int kind, int unused) {
+    private void rotateSelected(float delta) {
+        CustomScene.Box box = selectedBox();
+        if (box == null) {
+            Toast.makeText(this, "先选中文字框或图片", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        box.rotation = CustomScene.normalizeRotation(box.rotation + delta);
+        canvas.invalidate();
+        updateHint();
+    }
+
+    private void resetSelectedRotation() {
+        CustomScene.Box box = selectedBox();
+        if (box == null) {
+            Toast.makeText(this, "先选中文字框或图片", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        box.rotation = 0f;
+        canvas.invalidate();
+        updateHint();
+    }
+
+    private void flipSelected(boolean horizontal) {
         if (canvas.getSelectedType() != LayoutCanvasView.TYPE_IMAGE) {
             Toast.makeText(this, "先选中一张图片", Toast.LENGTH_SHORT).show();
             return;
@@ -162,22 +172,22 @@ public class LayoutEditorActivity extends AppCompatActivity {
         int index = canvas.getSelectedIndex();
         if (index < 0 || index >= scene.images.size()) return;
         CustomScene.ImageBox box = scene.images.get(index);
-        if (kind == 1) {
-            box.rotation = (box.rotation + 90) % 360;
-            // 转 90° 时把框的宽高对调，否则方图会被裁掉；与别的框冲突就保持原样
-            CustomScene.Box candidate = new CustomScene.Box(box.x, box.y,
-                    Math.min(box.h, 1f - box.x), Math.min(box.w, 1f - box.y));
-            if (!overlapsAny(candidate)) {
-                box.w = candidate.w;
-                box.h = candidate.h;
-            }
-        } else if (kind == 2) {
+        if (horizontal) {
             box.flipH = !box.flipH;
-        } else if (kind == 3) {
+        } else {
             box.flipV = !box.flipV;
         }
         reloadBitmaps();
         updateHint();
+    }
+
+    private CustomScene.Box selectedBox() {
+        if (canvas.getSelectedType() == LayoutCanvasView.TYPE_TEXT) return scene.text;
+        if (canvas.getSelectedType() == LayoutCanvasView.TYPE_IMAGE) {
+            int index = canvas.getSelectedIndex();
+            if (index >= 0 && index < scene.images.size()) return scene.images.get(index);
+        }
+        return null;
     }
 
     private void resizeWidget(int deltaWidth, int deltaHeight) {
@@ -195,8 +205,9 @@ public class LayoutEditorActivity extends AppCompatActivity {
             }
             CustomScene.ImageBox box = scene.images.get(i);
             String source = firstFrameName(box.name);
-            Bitmap bitmap = ImageStore.decodeTransformed(this, source, 480,
-                    box.rotation, box.flipH, box.flipV);
+            // 旋转交给画布，这里只烘焙镜像
+            Bitmap bitmap = ImageStore.decodeFlipped(this, source, 480,
+                    box.flipH, box.flipV);
             canvas.setBitmap(i, bitmap);
         }
     }
@@ -210,11 +221,12 @@ public class LayoutEditorActivity extends AppCompatActivity {
         String selected;
         int type = canvas.getSelectedType();
         if (type == LayoutCanvasView.TYPE_TEXT) {
-            selected = "已选中：文字框";
-        } else if (type == LayoutCanvasView.TYPE_IMAGE && canvas.getSelectedIndex() >= 0) {
+            selected = "已选中：文字框（旋转 " + Math.round(scene.text.rotation) + "°）";
+        } else if (type == LayoutCanvasView.TYPE_IMAGE && canvas.getSelectedIndex() >= 0
+                && canvas.getSelectedIndex() < scene.images.size()) {
             CustomScene.ImageBox box = scene.images.get(canvas.getSelectedIndex());
             selected = "已选中：图片 " + (canvas.getSelectedIndex() + 1)
-                    + "（旋转 " + box.rotation + "°"
+                    + "（旋转 " + Math.round(box.rotation) + "°"
                     + (box.flipH ? "，水平镜像" : "")
                     + (box.flipV ? "，垂直镜像" : "") + "）";
         } else {
@@ -222,7 +234,8 @@ public class LayoutEditorActivity extends AppCompatActivity {
         }
         hint.setText("小组件 " + scene.widthDp + "×" + scene.heightDp + "dp · "
                 + scene.images.size() + "/" + MAX_IMAGES + " 张图片 · " + selected
-                + "\n拖框移动，拖右下角改大小；相交时会放弃这次位移");
+                + "\n拖动移动，拖右下角改大小，拖右上角圆点任意角度旋转；框之间可以重叠"
+                + "\n「旋转」每按一次 +" + Math.round(ROTATE_STEP) + "°，长按归零");
     }
 
     @Override

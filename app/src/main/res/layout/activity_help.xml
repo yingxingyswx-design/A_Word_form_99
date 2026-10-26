@@ -106,7 +106,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="打开「自定义布局」后点「调整文字 / 图片位置」：\n\n· 拖动框体移动，拖右下角改大小\n· 文字框与图片框是实体，相交时这次位移会被放弃\n· 可加最多 4 张图，支持删除、旋转 90°、水平 / 垂直镜像\n· 「宽 +/− / 高 +/−」调整小组件尺寸，画布按同比例预览"
+                        android:text="打开「自定义布局」后点「调整文字 / 图片位置」：\n\n· 拖动框体移动，拖右下角改大小\n· 拖框右上角的圆点可以任意角度旋转，没有角度限制，文字框和图片都能转\n· 文字框与图片框可以自由重叠，图片按添加顺序盖在文字上面\n· 可加最多 4 张图，支持删除、水平 / 垂直镜像\n· 「旋转」按钮每次微调 +1°，长按归零\n· 「宽 +/− / 高 +/−」调整小组件尺寸，画布按同比例预览"
                         android:textAppearance="?attr/textAppearanceBodyMedium" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

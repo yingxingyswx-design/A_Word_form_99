@@ -308,6 +308,11 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 Math.max(0, contentWidth - textLeft - textWidth),
                 Math.max(0, contentHeight - textTop - textHeight));
         views.setViewVisibility(R.id.text_box, scene.textBox ? View.VISIBLE : View.GONE);
+        // 文字框和文字一起绕框中心旋转。旋转必须落在真正的框视图上：
+        // text_wrap 本身是整块小组件，padding 只是把子视图挤成框的大小。
+        float textRotation = Math.round(CustomScene.normalizeRotation(scene.text.rotation) * 10f) / 10f;
+        views.setFloat(R.id.text_box, "setRotation", textRotation);
+        views.setFloat(R.id.text_content, "setRotation", textRotation);
         // 框高固定时，先按可容纳的行数把句子截断，避免出现半行被硬裁的画面
         views.setTextViewText(R.id.quote_text, fitText(context, quote.text,
                 textWidth, Math.max(0, textHeight - Math.round(30 * density)),
@@ -333,11 +338,15 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             views.setViewPadding(SLOT_WRAP[i], left, top,
                     Math.max(0, contentWidth - left - width),
                     Math.max(0, contentHeight - top - height));
+            // 任意角度旋转：ImageView / AdapterViewFlipper 的尺寸正好是框，绕自身中心转即可
+            float rotation = Math.round(CustomScene.normalizeRotation(box.rotation) * 10f) / 10f;
+            views.setFloat(SLOT_IMAGE[i], "setRotation", rotation);
+            views.setFloat(SLOT_FLIPPER[i], "setRotation", rotation);
 
             List<String> frames = ImageStore.frameNames(context, box.name);
             if (frames.size() > 1) {
-                Bitmap first = ImageStore.decodeTransformed(context, frames.get(0),
-                        ImageStore.WIDGET_MAX_PX, box.rotation, box.flipH, box.flipV);
+                Bitmap first = ImageStore.decodeFlipped(context, frames.get(0),
+                        ImageStore.WIDGET_MAX_PX, box.flipH, box.flipV);
                 if (first != null) {
                     views.setImageViewBitmap(SLOT_IMAGE[i], first);
                     views.setViewVisibility(SLOT_IMAGE[i], View.VISIBLE);
@@ -346,13 +355,12 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 }
 
                 Intent adapter = new Intent(context, QuoteImageWidgetService.class);
-                // data 参与 RemoteViewsService 的工厂缓存 key，槽位与变换都要带进去
+                // data 参与 RemoteViewsService 的工厂缓存 key，槽位与镜像都要带进去
                 adapter.setData(Uri.parse("slot://" + i + "/" + box.name + "/"
-                        + box.rotation + "/" + box.flipH + "/" + box.flipV));
+                        + box.flipH + "/" + box.flipV));
                 adapter.putStringArrayListExtra(QuoteImageWidgetService.EXTRA_FRAMES,
                         new ArrayList<>(frames));
                 adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, frameBackground);
-                adapter.putExtra(QuoteImageWidgetService.EXTRA_ROTATION, box.rotation);
                 adapter.putExtra(QuoteImageWidgetService.EXTRA_FLIP_H, box.flipH);
                 adapter.putExtra(QuoteImageWidgetService.EXTRA_FLIP_V, box.flipV);
                 views.setRemoteAdapter(widgetId, SLOT_FLIPPER[i], adapter);
@@ -360,8 +368,8 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 animatedMask |= 1 << i;
             } else {
                 views.setViewVisibility(SLOT_FLIPPER[i], View.GONE);
-                Bitmap bitmap = ImageStore.decodeTransformed(context, box.name,
-                        ImageStore.WIDGET_MAX_PX, box.rotation, box.flipH, box.flipV);
+                Bitmap bitmap = ImageStore.decodeFlipped(context, box.name,
+                        ImageStore.WIDGET_MAX_PX, box.flipH, box.flipV);
                 if (bitmap != null) {
                     views.setImageViewBitmap(SLOT_IMAGE[i], bitmap);
                     views.setViewVisibility(SLOT_IMAGE[i], View.VISIBLE);

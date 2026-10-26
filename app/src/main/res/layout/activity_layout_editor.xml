@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="拖动框体移动，拖右下角改大小；文字与图片不允许重叠"
+        android:text="拖动移动，拖右下角改大小，拖右上角圆点任意角度旋转；框之间可以重叠"
         android:textAppearance="?attr/textAppearanceBodySmall"
         android:textColor="?attr/colorOnSurfaceVariant" />
 

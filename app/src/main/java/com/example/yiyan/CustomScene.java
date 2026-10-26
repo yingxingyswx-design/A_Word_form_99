@@ -13,13 +13,17 @@ import java.util.List;
  * 自定义布局的「场景」：小组件尺寸、文字框、若干图片框。
  *
  * 位置与大小都存成 0–1 的分数（相对内容区），这样同一套布局在任意尺寸的小组件上
- * 都能按比例还原。图片框额外带旋转角度与水平/垂直镜像。
+ * 都能按比例还原。文字框与图片框都能绕自身中心任意旋转，图片框额外带水平/垂直镜像。
+ * 框与框之间允许重叠：绘制顺序固定为文字在下、图片按列表顺序在上。
  *
  * 持久化用 org.json（Android 自带，不引第三方库）。
  */
 final class CustomScene {
 
     static final String PREF_KEY = "custom_scene";
+
+    /** 场景数据版本。2 起旋转角度为任意值；旧版是 0/90/180/270 且已烘焙进位图。 */
+    private static final int VERSION = 2;
 
     /** 小组件基准尺寸（dp），编辑器的画布比例和小组件都按它换算。 */
     int widthDp = 409;
@@ -32,6 +36,8 @@ final class CustomScene {
 
     static class Box {
         float x, y, w, h;
+        /** 绕框中心的顺时针旋转角度，任意值，统一归一到 0–360。 */
+        float rotation;
 
         Box(float x, float y, float w, float h) {
             this.x = x;
@@ -41,20 +47,14 @@ final class CustomScene {
         }
 
         Box copy() {
-            return new Box(x, y, w, h);
-        }
-
-        boolean intersects(Box other, float gap) {
-            return x < other.x + other.w + gap
-                    && x + w + gap > other.x
-                    && y < other.y + other.h + gap
-                    && y + h + gap > other.y;
+            Box box = new Box(x, y, w, h);
+            box.rotation = rotation;
+            return box;
         }
     }
 
     static final class ImageBox extends Box {
         String name = "";
-        int rotation;      // 0/90/180/270
         boolean flipH;
         boolean flipV;
 
@@ -64,8 +64,8 @@ final class CustomScene {
 
         ImageBox copy() {
             ImageBox box = new ImageBox(x, y, w, h);
-            box.name = name;
             box.rotation = rotation;
+            box.name = name;
             box.flipH = flipH;
             box.flipV = flipV;
             return box;
@@ -74,6 +74,13 @@ final class CustomScene {
 
     static CustomScene defaults() {
         return new CustomScene();
+    }
+
+    /** 把任意角度归一到 [0, 360)。 */
+    static float normalizeRotation(float degrees) {
+        float value = degrees % 360f;
+        if (value < 0) value += 360f;
+        return value;
     }
 
     static CustomScene load(SharedPreferences prefs) {
@@ -93,6 +100,7 @@ final class CustomScene {
     JSONObject toJson() {
         JSONObject root = new JSONObject();
         try {
+            root.put("v", VERSION);
             root.put("w", widthDp);
             root.put("h", heightDp);
             root.put("textBox", textBox);
@@ -101,7 +109,6 @@ final class CustomScene {
             for (ImageBox image : images) {
                 JSONObject item = boxToJson(image);
                 item.put("n", image.name);
-                item.put("r", image.rotation);
                 item.put("fh", image.flipH);
                 item.put("fv", image.flipV);
                 array.put(item);
@@ -118,6 +125,7 @@ final class CustomScene {
         json.put("y", round(box.y));
         json.put("w", round(box.w));
         json.put("h", round(box.h));
+        json.put("r", Math.round(normalizeRotation(box.rotation) * 10d) / 10d);
         return json;
     }
 
@@ -127,6 +135,7 @@ final class CustomScene {
 
     static CustomScene fromJson(JSONObject root) throws JSONException {
         CustomScene scene = new CustomScene();
+        int version = root.optInt("v", 1);
         scene.widthDp = Math.max(120, root.optInt("w", 409));
         scene.heightDp = Math.max(80, root.optInt("h", 236));
         scene.textBox = root.optBoolean("textBox", false);
@@ -136,6 +145,7 @@ final class CustomScene {
             scene.text.y = (float) text.optDouble("y", 0.06);
             scene.text.w = (float) text.optDouble("w", 0.62);
             scene.text.h = (float) text.optDouble("h", 0.36);
+            scene.text.rotation = normalizeRotation((float) text.optDouble("r", 0));
         }
         JSONArray array = root.optJSONArray("images");
         if (array != null) {
@@ -148,9 +158,20 @@ final class CustomScene {
                         (float) item.optDouble("w", 0.25),
                         (float) item.optDouble("h", 0.3));
                 box.name = item.optString("n", "");
-                box.rotation = item.optInt("r", 0);
+                float rotation = (float) item.optDouble("r", 0);
+                box.rotation = normalizeRotation(rotation);
                 box.flipH = item.optBoolean("fh", false);
                 box.flipV = item.optBoolean("fv", false);
+                // 旧版把 90°/270° 烘焙进图片，并交换过框的宽高；转成自由角度后要换回来，
+                // 否则同一份布局升级后会横竖颠倒。
+                if (version < 2) {
+                    int legacy = Math.round(rotation) % 360;
+                    if (legacy == 90 || legacy == 270) {
+                        float width = box.w;
+                        box.w = box.h;
+                        box.h = width;
+                    }
+                }
                 scene.images.add(box);
             }
         }
