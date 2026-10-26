@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="支持格式"
+            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="根节点名字随意；条目用 &lt;quote&gt; 或 &lt;item&gt;。\n只有 text（句子）必填，author / work / category 都可省略。\n可以用属性，也可以用同名子标签；重复条目会自动跳过。"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="示例"
+            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/code_block_bg"
+            android:fontFamily="monospace"
+            android:padding="12dp"
+            android:text="&lt;quotes&gt;\n  &lt;quote text=&quot;人生如逆旅，我亦是行人。&quot;\n         author=&quot;苏轼&quot; work=&quot;临江仙&quot;\n         category=&quot;诗词&quot;/&gt;\n\n  &lt;quote&gt;\n    &lt;text&gt;慢慢来，比较快。&lt;/text&gt;\n    &lt;author&gt;佚名&lt;/author&gt;\n    &lt;category&gt;随想&lt;/category&gt;\n  &lt;/quote&gt;\n&lt;/quotes&gt;"
+            android:textColor="?attr/colorOnSurface"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="最简形式：&lt;quote text=&quot;只有一句话&quot;/&gt;"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="导入后条目会进入「用户添加」，可以在「一言管理」里继续改作者、出处和配图。"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+</ScrollView>

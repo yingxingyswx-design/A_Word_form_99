@@ -65,7 +65,7 @@ ikka.shizuku.ShizukuProvider 且**不能**加 moe.shizuku.manager.permission.API
   - 「雾面程度 / 玻璃浓度 / 高光 / 圆角 / 浅深色调」都能在页面里实时预览；预览底图就是 App 读到的真实壁纸，玻璃位图和桌面上用的是同一份渲染结果。玻璃要读壁纸，所以同一张卡片里有「壁纸读取」状态和授权入口。
 - 「实时玻璃页」仍然用 GPU 上的 RuntimeShader 每帧计算折射、色散和高光，能直接看到玻璃边缘随背景变化。
 - 「个性」Tab = 玻璃材质 + 桌面布局 + 字号 + 主题色；「设置」Tab 仍是 XML 导入、GitHub Release 更新检查与下载安装、说明书。更新检查优先走 `api.github.com`，被 DNS 拦掉时退回 `github.com/…/releases.atom`。
-- XML 导入格式：根节点随意，条目用 `<quote>` 或 `<item>`，属性 `text/author/work/category` 或同名子标签均可，只有 `text` 必填，重复条目跳过。
+- XML 导入格式：根节点随意，条目用 `<quote>` 或 `<item>`，属性 `text/author/work/category` 或同名子标签均可，只有 `text` 必填，重复条目跳过；设置页「选择 XML 文件」下方有「查看格式和示例」弹窗，示例可直接选中复制。
 - Android 6.0+（minSdk 24），Java 实现。
 
 ## 玻璃是怎么算出来的

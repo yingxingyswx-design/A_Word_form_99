@@ -685,6 +685,16 @@ public class SettingsActivity extends ThemedActivity {
                 Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
             }
         });
+        findViewById(R.id.import_format_help).setOnClickListener(v -> showImportFormatDialog());
+    }
+
+    private void showImportFormatDialog() {
+        View content = getLayoutInflater().inflate(R.layout.dialog_import_format, null);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("导入格式和示例")
+                .setView(content)
+                .setPositiveButton("知道了", null)
+                .show();
     }
 
     @Override
