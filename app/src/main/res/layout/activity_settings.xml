@@ -454,6 +454,14 @@
                             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
                         <TextView
+                            android:id="@+id/update_channel"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="更新频道：GitHub Release（稳定版）"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorPrimary" />
+
+                        <TextView
                             android:id="@+id/update_latest"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -477,6 +485,14 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
                             android:text="检查 GitHub 更新" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_toggle_channel"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="切换到「含预发布」频道" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btn_download_update"

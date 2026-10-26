@@ -37,9 +37,14 @@ final class UpdateChecker {
     private UpdateChecker() {
     }
 
-    static Release fetchLatest() throws Exception {
+    /** 更新频道：GitHub Release。stable 只看正式发布，prerelease 连预发布一起看。 */
+    static final String CHANNEL_STABLE = "stable";
+    static final String CHANNEL_PRERELEASE = "prerelease";
+
+    static Release fetchLatest(String channel) throws Exception {
+        boolean includePrerelease = CHANNEL_PRERELEASE.equals(channel);
         try {
-            return fetchFromApi();
+            return includePrerelease ? fetchFromList() : fetchFromApi();
         } catch (Exception apiError) {
             // 部分网络会拦掉 api.github.com 的 DNS，退回读 releases.atom（同一个 github.com 域名）
             try {
@@ -58,9 +63,30 @@ final class UpdateChecker {
         connection.setRequestProperty("User-Agent", "DailyLine-Android");
         int code = connection.getResponseCode();
         if (code != 200) throw new IOException("GitHub 返回 HTTP " + code);
+        return parseRelease(new JSONObject(readAll(connection.getInputStream())));
+    }
 
-        String body = readAll(connection.getInputStream());
-        JSONObject json = new JSONObject(body);
+    /** 取最近若干条 Release，挑第一条非草稿（可能含预发布）。 */
+    private static Release fetchFromList() throws Exception {
+        String url = "https://api.github.com/repos/" + REPO + "/releases?per_page=10";
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(15000);
+        connection.setRequestProperty("Accept", "application/vnd.github+json");
+        connection.setRequestProperty("User-Agent", "DailyLine-Android");
+        int code = connection.getResponseCode();
+        if (code != 200) throw new IOException("GitHub 返回 HTTP " + code);
+
+        JSONArray list = new JSONArray(readAll(connection.getInputStream()));
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject item = list.optJSONObject(i);
+            if (item == null || item.optBoolean("draft", false)) continue;
+            return parseRelease(item);
+        }
+        throw new IOException("没有可用的发布记录");
+    }
+
+    private static Release parseRelease(JSONObject json) throws Exception {
         Release release = new Release();
         release.tag = json.optString("tag_name", "");
         release.name = json.optString("name", release.tag);

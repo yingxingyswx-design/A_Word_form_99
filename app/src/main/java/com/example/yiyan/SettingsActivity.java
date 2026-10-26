@@ -26,6 +26,7 @@ import java.util.Set;
 public class SettingsActivity extends AppCompatActivity {
 
     private static final int REQUEST_IMPORT_XML = 4401;
+    private static final String KEY_UPDATE_CHANNEL = "updateChannel";
 
     private SharedPreferences prefs;
     private boolean autoChecked;
@@ -246,11 +247,32 @@ public class SettingsActivity extends AppCompatActivity {
     private void bindUpdate() {
         TextView current = findViewById(R.id.update_current);
         current.setText("当前版本 " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")");
+        refreshChannelUi();
 
         findViewById(R.id.btn_check_update).setOnClickListener(v -> checkUpdate(false));
         findViewById(R.id.btn_download_update).setOnClickListener(v -> downloadUpdate());
         findViewById(R.id.open_help).setOnClickListener(v ->
                 startActivity(new Intent(this, HelpActivity.class)));
+        findViewById(R.id.btn_toggle_channel).setOnClickListener(v -> {
+            boolean prerelease = UpdateChecker.CHANNEL_PRERELEASE.equals(updateChannel());
+            prefs.edit().putString(KEY_UPDATE_CHANNEL,
+                    prerelease ? UpdateChecker.CHANNEL_STABLE : UpdateChecker.CHANNEL_PRERELEASE).apply();
+            refreshChannelUi();
+            checkUpdate(false);
+        });
+    }
+
+    private String updateChannel() {
+        return prefs.getString(KEY_UPDATE_CHANNEL, UpdateChecker.CHANNEL_STABLE);
+    }
+
+    private void refreshChannelUi() {
+        boolean prerelease = UpdateChecker.CHANNEL_PRERELEASE.equals(updateChannel());
+        TextView channel = findViewById(R.id.update_channel);
+        channel.setText("更新频道：GitHub Release"
+                + (prerelease ? "（含预发布）" : "（稳定版）"));
+        MaterialButton toggle = findViewById(R.id.btn_toggle_channel);
+        toggle.setText(prerelease ? "切换到「稳定版」频道" : "切换到「含预发布」频道");
     }
 
     private void maybeAutoCheckUpdate() {
@@ -265,7 +287,7 @@ public class SettingsActivity extends AppCompatActivity {
         status.setText("正在检查…");
         new Thread(() -> {
             try {
-                UpdateChecker.Release release = UpdateChecker.fetchLatest();
+                UpdateChecker.Release release = UpdateChecker.fetchLatest(updateChannel());
                 runOnUiThread(() -> {
                     this.latestRelease = release;
                     boolean newer = UpdateChecker.isNewer(release.tag, BuildConfig.VERSION_NAME);
