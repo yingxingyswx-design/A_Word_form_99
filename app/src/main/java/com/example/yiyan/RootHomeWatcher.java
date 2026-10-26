@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * 「回到桌面自动换一句」。
  *
- * 小组件收不到「进入桌面」这个事件（Android 没有这种广播），所以这里用一个每秒一次的
+ * 小组件收不到「进入桌面」这个事件（Android 没有这种广播），所以这里用一个每 0.2 秒一次的
  * 轻量脚本监听当前焦点窗口，焦点从别的应用切回桌面时发一次
  * `am broadcast -a com.example.yiyan.NEXT_QUOTE`。
  *
@@ -201,7 +201,7 @@ public final class RootHomeWatcher {
                 + "      ;;\n"
                 + "    *) last=\"other\" ;;\n"
                 + "  esac\n"
-                + "  sleep 1\n"
+                + "  sleep 0.2\n"
                 + "done\n";
     }
 
