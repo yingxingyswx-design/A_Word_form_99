@@ -64,6 +64,32 @@ public class SettingsActivity extends AppCompatActivity {
         bindUpdate();
         bindRefreshAll();
         bindBottomNav();
+        requestPrivileges();
+    }
+
+    /**
+     * 进入 App 时主动要权限：先问 root 管理器（Magisk 弹授权框），
+     * 再问 Shizuku（已运行且未授权时弹 Shizuku 的授权框）。
+     */
+    private void requestPrivileges() {
+        new Thread(() -> {
+            final boolean root = RootHomeWatcher.requestRoot();
+            final boolean shizukuRunning = RootHomeWatcher.hasShizuku();
+            final boolean shizukuGranted = shizukuRunning && RootHomeWatcher.shizukuGranted();
+            final boolean shizukuInstalled = RootHomeWatcher.shizukuInstalled(this);
+            runOnUiThread(() -> {
+                if (shizukuRunning && !shizukuGranted) {
+                    RootHomeWatcher.requestShizukuPermission();
+                }
+                refreshRootStatus(findViewById(R.id.root_status));
+                if (!root && !shizukuRunning) {
+                    Toast.makeText(this, shizukuInstalled
+                                    ? "Shizuku 未运行：请先启动 Shizuku 再回来开启"
+                                    : "没有 root，也没检测到 Shizuku",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
     }
 
     /**
@@ -231,11 +257,17 @@ public class SettingsActivity extends AppCompatActivity {
         new Thread(() -> {
             final boolean running = RootHomeWatcher.isRunning(this);
             final String backend = RootHomeWatcher.backend(this);
+            final boolean root = RootHomeWatcher.rootGranted();
+            final boolean shizukuRunning = RootHomeWatcher.hasShizuku();
+            final boolean shizukuGranted = shizukuRunning && RootHomeWatcher.shizukuGranted();
+            final String shizukuText = !shizukuRunning ? "未运行"
+                    : (shizukuGranted ? "已授权" : "未授权");
             final String label = RootHomeWatcher.BACKEND_SHIZUKU.equals(backend)
                     ? "Shizuku" : "root";
-            runOnUiThread(() -> status.setText(running
-                    ? "状态：运行中（" + label + "）· 正在监听回到桌面"
-                    : "状态：未运行"));
+            runOnUiThread(() -> status.setText(
+                    "Root：" + (root ? "已授权" : "未授权")
+                            + " · Shizuku：" + shizukuText
+                            + (running ? " · 监听中（" + label + "）" : " · 未监听")));
         }).start();
     }
 

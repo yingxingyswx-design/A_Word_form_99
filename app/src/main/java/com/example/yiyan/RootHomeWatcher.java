@@ -53,7 +53,7 @@ public final class RootHomeWatcher {
     // ---- 可用性 ----
 
     public static boolean hasRoot() {
-        String output = runSu("id", 4000);
+        String output = runSu("id", 8000);
         return output != null && output.contains("uid=0");
     }
 
@@ -61,6 +61,22 @@ public final class RootHomeWatcher {
         try {
             return rikka.shizuku.Shizuku.pingBinder();
         } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** 进入 App 时主动向 root 管理器要一次权限（Magisk 会弹授权框）。 */
+    public static boolean requestRoot() {
+        // 第一次调用会触发 Magisk 的授权对话框；已授权则直接返回 uid=0
+        rootCache = hasRoot();
+        return rootCache;
+    }
+
+    public static boolean shizukuInstalled(Context context) {
+        try {
+            context.getPackageManager().getPackageInfo("moe.shizuku.privileged.api", 0);
+            return true;
+        } catch (Exception e) {
             return false;
         }
     }
@@ -196,8 +212,28 @@ public final class RootHomeWatcher {
 
     // ---- 执行 ----
 
+    /** 依次尝试常见 su 路径（不同 ROM/Magisk 版本位置不同）。 */
+    private static final String[] SU_PATHS = {
+            "su", "/system/bin/su", "/system/xbin/su", "/sbin/su", "/debug_ramdisk/su"};
+
+    private static Boolean rootCache;
+
     private static String runSu(String command, long timeoutMs) {
-        return exec(new String[]{"su", "-c", command}, timeoutMs);
+        for (String path : SU_PATHS) {
+            String output = exec(new String[]{path, "-c", command}, timeoutMs);
+            if (output != null) return output;
+        }
+        return null;
+    }
+
+    /** 缓存的 root 状态（避免状态栏刷新时反复弹授权框）。 */
+    public static boolean rootGranted() {
+        if (rootCache == null) rootCache = hasRoot();
+        return rootCache;
+    }
+
+    public static void invalidateCache() {
+        rootCache = null;
     }
 
     /**
