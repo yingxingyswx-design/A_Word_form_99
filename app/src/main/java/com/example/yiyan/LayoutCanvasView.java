@@ -450,10 +450,32 @@ public class LayoutCanvasView extends View {
             double rad = Math.toRadians(-target.rotation);
             float localX = (float) (dx * Math.cos(rad) - dy * Math.sin(rad));
             float localY = (float) (dx * Math.sin(rad) + dy * Math.cos(rad));
-            float width = dragOrigin.width() / Math.max(1f, contentRect.width());
-            float height = dragOrigin.height() / Math.max(1f, contentRect.height());
-            target.w = clampSize(width + localX / Math.max(1f, contentRect.width()));
-            target.h = clampSize(height + localY / Math.max(1f, contentRect.height()));
+
+            if (target instanceof CustomScene.ImageBox) {
+                // 图片框等比缩放：取横/纵中拖动更明显的一轴作为统一倍率，
+                // 保持框在屏幕上的像素宽高比不变，避免 centerCrop 的裁剪关系被拉变形。
+                float baseW = Math.max(1f, dragOrigin.width());
+                float baseH = Math.max(1f, dragOrigin.height());
+                float sx = (baseW + localX) / baseW;
+                float sy = (baseH + localY) / baseH;
+                float scale = Math.abs(sx - 1f) >= Math.abs(sy - 1f) ? sx : sy;
+
+                float contentW = Math.max(1f, contentRect.width());
+                float contentH = Math.max(1f, contentRect.height());
+                float minScale = Math.max(MIN_SIZE * contentW / baseW,
+                        MIN_SIZE * contentH / baseH);
+                float maxScale = Math.min(MAX_SIZE * contentW / baseW,
+                        MAX_SIZE * contentH / baseH);
+                scale = Math.max(minScale, Math.min(maxScale, scale));
+
+                target.w = baseW * scale / contentW;
+                target.h = baseH * scale / contentH;
+            } else {
+                float width = dragOrigin.width() / Math.max(1f, contentRect.width());
+                float height = dragOrigin.height() / Math.max(1f, contentRect.height());
+                target.w = clampSize(width + localX / Math.max(1f, contentRect.width()));
+                target.h = clampSize(height + localY / Math.max(1f, contentRect.height()));
+            }
             invalidate();
             return true;
         }
