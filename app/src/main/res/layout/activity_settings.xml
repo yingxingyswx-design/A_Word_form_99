@@ -574,7 +574,56 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Yiyan.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="保存组件"
+                            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="把当前主题、背景、布局和玻璃参数存成一套，最多 10 个；点条目即可切换。"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/save_widget_preset"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="保存当前组件" />
+
+                        <TextView
+                            android:id="@+id/saved_widget_empty"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="还没有保存的组件"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <LinearLayout
+                            android:id="@+id/saved_widget_list"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:orientation="vertical" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                <com.google.android.material.card.MaterialCardView
                     style="@style/Widget.Yiyan.Card"

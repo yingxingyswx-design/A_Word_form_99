@@ -1,16 +1,22 @@
 package com.example.yiyan;
 
 import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,11 +25,13 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.slider.Slider;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class SettingsActivity extends ThemedActivity {
@@ -76,6 +84,7 @@ public class SettingsActivity extends ThemedActivity {
         bindGlass();
         bindGlassPermission();
         bindCustomBackground();
+        bindWidgetPresets();
         bindRootHomeWatch();
         bindAddQuote();
         bindCustomLayout();
@@ -83,6 +92,7 @@ public class SettingsActivity extends ThemedActivity {
         bindUpdate();
         bindRefreshAll();
         bindBottomNav();
+        restorePanel(savedInstanceState);
         requestPrivileges();
     }
 
@@ -395,6 +405,195 @@ public class SettingsActivity extends ThemedActivity {
         }
         status.setText(text.toString());
     }
+    // ---- 保存组件（外观预设） ----
+
+    private void bindWidgetPresets() {
+        findViewById(R.id.save_widget_preset).setOnClickListener(v -> {
+            WidgetPresetStore.Preset preset = WidgetPresetStore.saveCurrent(prefs);
+            if (preset == null) {
+                Toast.makeText(this, "最多保存 " + WidgetPresetStore.MAX + " 个组件，请先删除一个",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            refreshSavedWidgets();
+            Toast.makeText(this, "已保存「" + preset.name + "」", Toast.LENGTH_SHORT).show();
+        });
+        refreshSavedWidgets();
+    }
+
+    private void refreshSavedWidgets() {
+        LinearLayout list = findViewById(R.id.saved_widget_list);
+        TextView empty = findViewById(R.id.saved_widget_empty);
+        if (list == null || empty == null) return;
+        List<WidgetPresetStore.Preset> presets = WidgetPresetStore.load(prefs);
+        empty.setVisibility(presets.isEmpty() ? View.VISIBLE : View.GONE);
+        list.removeAllViews();
+        for (WidgetPresetStore.Preset preset : presets) {
+            list.addView(buildWidgetPresetRow(preset));
+        }
+    }
+
+    private View buildWidgetPresetRow(WidgetPresetStore.Preset preset) {
+        MaterialCardView card = new MaterialCardView(this);
+        card.setRadius(dp(18));
+        card.setCardElevation(0f);
+        card.setCardBackgroundColor(getColor(R.color.md_surface_container_high));
+        card.setStrokeWidth(dp(1));
+        card.setStrokeColor(0x22000000);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardLp.topMargin = dp(8);
+        card.setLayoutParams(cardLp);
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription("应用 " + preset.name);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dp(10), dp(8), dp(10));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setLayoutParams(new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView name = new TextView(this);
+        name.setText(preset.name);
+        name.setTextSize(14);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextColor(getColor(R.color.md_on_surface));
+        labels.addView(name);
+
+        TextView summary = new TextView(this);
+        summary.setText(preset.summary());
+        summary.setTextSize(11);
+        summary.setMaxLines(2);
+        summary.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        summary.setTextColor(getColor(R.color.md_on_surface_variant));
+        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        summaryLp.topMargin = dp(2);
+        summary.setLayoutParams(summaryLp);
+        labels.addView(summary);
+
+        TextView delete = new TextView(this);
+        delete.setText("删除");
+        delete.setTextSize(12);
+        delete.setTypeface(Typeface.DEFAULT_BOLD);
+        delete.setTextColor(getColor(R.color.md_primary));
+        delete.setGravity(Gravity.CENTER);
+        delete.setPadding(dp(12), dp(6), dp(12), dp(6));
+        delete.setClickable(true);
+        delete.setFocusable(true);
+        android.util.TypedValue ripple = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, ripple, true);
+        if (ripple.resourceId != 0) delete.setBackgroundResource(ripple.resourceId);
+        delete.setOnClickListener(v -> {
+            WidgetPresetStore.delete(prefs, preset.id);
+            refreshSavedWidgets();
+            Toast.makeText(this, "已删除「" + preset.name + "」", Toast.LENGTH_SHORT).show();
+        });
+
+        row.addView(labels);
+        row.addView(delete);
+        card.addView(row);
+        // MaterialCardView 里再包 LinearLayout 时，部分 ROM 的触摸会被子层吃掉；
+        // 卡片和行都挂上监听，点文字区域也能稳定触发。
+        card.setOnClickListener(v -> confirmUseWidgetPreset(preset));
+        card.setOnLongClickListener(v -> {
+            showWidgetPresetEditMenu(preset);
+            return true;
+        });
+        row.setClickable(true);
+        row.setOnClickListener(v -> confirmUseWidgetPreset(preset));
+        row.setOnLongClickListener(v -> {
+            showWidgetPresetEditMenu(preset);
+            return true;
+        });
+        return card;
+    }
+
+    /** 点击条目先二次确认，避免误触直接覆盖当前组件。 */
+    private void confirmUseWidgetPreset(WidgetPresetStore.Preset preset) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("使用「" + preset.name + "」？")
+                .setMessage(preset.summary())
+                .setNegativeButton("取消", null)
+                .setPositiveButton("使用", (dialog, which) -> applyWidgetPreset(preset))
+                .show();
+    }
+
+    /** 长按编辑：查看 2×2 视图预览 / 重命名；删除仍走条目右侧按钮。 */
+    private void showWidgetPresetEditMenu(WidgetPresetStore.Preset preset) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(preset.name)
+                .setItems(new String[]{"查看小组件视图", "重命名"}, (dialog, which) -> {
+                    if (which == 0) showWidgetPresetPreview(preset);
+                    else showRenameWidgetPresetDialog(preset);
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showWidgetPresetPreview(WidgetPresetStore.Preset preset) {
+        View content = getLayoutInflater().inflate(R.layout.dialog_widget_preview, null);
+        WidgetPresetPreviewView preview = content.findViewById(R.id.preset_preview_view);
+        preview.setPreset(preset);
+        ((TextView) content.findViewById(R.id.preset_preview_summary)).setText(preset.summary());
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("小组件视图 · " + preset.name)
+                .setView(content)
+                .setNegativeButton("关闭", null)
+                .setPositiveButton("使用这套", (dialog, which) -> applyWidgetPreset(preset))
+                .show();
+    }
+
+    private void showRenameWidgetPresetDialog(WidgetPresetStore.Preset preset) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(preset.name);
+        input.setSelection(0, input.length());
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(4), dp(20), 0);
+        box.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        androidx.appcompat.app.AlertDialog dialog =
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("重命名组件")
+                        .setView(box)
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("保存", null)
+                        .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, "名称不能为空", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (name.length() > 24) name = name.substring(0, 24);
+                    WidgetPresetStore.rename(prefs, preset.id, name);
+                    refreshSavedWidgets();
+                    dialog.dismiss();
+                }));
+        dialog.show();
+    }
+
+    private void applyWidgetPreset(WidgetPresetStore.Preset preset) {
+        WidgetPresetStore.apply(prefs, preset);
+        CustomBackground.invalidate();
+        sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
+        Toast.makeText(this, "已切换为「" + preset.name + "」", Toast.LENGTH_SHORT).show();
+        recreate();
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     /** 回桌面自动换一句：root 常驻脚本监听焦点窗口，见 {@link RootHomeWatcher}。 */
     private void bindRootHomeWatch() {
         final MaterialSwitch watch = findViewById(R.id.root_home_watch);
@@ -663,6 +862,8 @@ public class SettingsActivity extends ThemedActivity {
 
     private void bindBottomNav() {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
+        // 自己保存当前 Tab；BottomNav 的自动恢复会和面板可见性不同步
+        nav.setSaveEnabled(false);
         nav.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
             int index = id == R.id.nav_theme ? 1 : id == R.id.nav_settings ? 2 : 0;
@@ -670,6 +871,29 @@ public class SettingsActivity extends ThemedActivity {
             if (index == 2) maybeAutoCheckUpdate();
             return true;
         });
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt("panelIndex", currentPanelIndex);
+        super.onSaveInstanceState(outState);
+    }
+
+    /** recreate（例如应用保存的组件）后恢复原 Tab，避免图标选中但内容回到「一言」。 */
+    private void restorePanel(Bundle savedInstanceState) {
+        int index = savedInstanceState == null ? 0 : savedInstanceState.getInt("panelIndex", 0);
+        if (index < 0 || index >= PANEL_IDS.length) index = 0;
+        currentPanelIndex = index;
+        for (int i = 0; i < PANEL_IDS.length; i++) {
+            View panel = findViewById(PANEL_IDS[i]);
+            panel.setVisibility(i == index ? View.VISIBLE : View.GONE);
+            panel.setAlpha(1f);
+            panel.setTranslationX(0f);
+        }
+        BottomNavigationView nav = findViewById(R.id.bottom_nav);
+        int itemId = index == 1 ? R.id.nav_theme : index == 2 ? R.id.nav_settings : R.id.nav_quotes;
+        nav.getMenu().findItem(itemId).setChecked(true);
+        if (index == 2) maybeAutoCheckUpdate();
     }
 
     /** 面板切换：新页面从滑动方向进入，旧页面反向退场，避免生硬地 GONE/VISIBLE 跳变。 */
