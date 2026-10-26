@@ -232,7 +232,7 @@ public class WidgetPresetPreviewView extends View {
             Path imageClip = new Path();
             imageClip.addRoundRect(target, dp(12), dp(12), Path.Direction.CW);
             canvas.clipPath(imageClip);
-            drawCenterCrop(canvas, quoteImage, target);
+            drawFitCenter(canvas, quoteImage, target);
             canvas.restore();
         }
     }
@@ -290,7 +290,7 @@ public class WidgetPresetPreviewView extends View {
             Path imageClip = new Path();
             imageClip.addRoundRect(rect, dp(10), dp(10), Path.Direction.CW);
             canvas.clipPath(imageClip);
-            drawCenterCrop(canvas, bitmap, rect);
+            drawFitCenter(canvas, bitmap, rect);
             canvas.restore();
         }
     }
@@ -317,6 +317,19 @@ public class WidgetPresetPreviewView extends View {
 
     private void drawCenterCrop(Canvas canvas, Bitmap bitmap, RectF target) {
         float scale = Math.max(target.width() / bitmap.getWidth(),
+                target.height() / bitmap.getHeight());
+        float w = bitmap.getWidth() * scale;
+        float h = bitmap.getHeight() * scale;
+        float left = target.left + (target.width() - w) / 2f;
+        float top = target.top + (target.height() - h) / 2f;
+        backgroundPaint.setShader(null);
+        canvas.drawBitmap(bitmap, null,
+                new RectF(left, top, left + w, top + h), backgroundPaint);
+    }
+
+    /** 配图 / 自定义图片框完整显示，不裁掉图像边缘。 */
+    private void drawFitCenter(Canvas canvas, Bitmap bitmap, RectF target) {
+        float scale = Math.min(target.width() / bitmap.getWidth(),
                 target.height() / bitmap.getHeight());
         float w = bitmap.getWidth() * scale;
         float h = bitmap.getHeight() * scale;

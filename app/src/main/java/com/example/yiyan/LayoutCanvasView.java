@@ -6,7 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
-import android.graphics.Rect;
 import android.graphics.RectF;
 import android.text.Layout;
 import android.text.StaticLayout;
@@ -272,7 +271,7 @@ public class LayoutCanvasView extends View {
 
         Bitmap bitmap = index < bitmaps.length ? bitmaps[index] : null;
         if (bitmap != null && !bitmap.isRecycled()) {
-            drawCenterCrop(canvas, bitmap, rect);
+            drawFitCenter(canvas, bitmap, rect);
         } else {
             canvas.drawRect(rect, boxFillPaint);
             Paint label = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -328,17 +327,16 @@ public class LayoutCanvasView extends View {
                 top + box.h * contentRect.height());
     }
 
-    private void drawCenterCrop(Canvas canvas, Bitmap bitmap, RectF destination) {
-        float scale = Math.max(destination.width() / bitmap.getWidth(),
+    /** 完整显示图片，按框的短边等比缩放并居中；不裁剪、不拉伸。 */
+    private void drawFitCenter(Canvas canvas, Bitmap bitmap, RectF destination) {
+        float scale = Math.min(destination.width() / bitmap.getWidth(),
                 destination.height() / bitmap.getHeight());
-        float sourceWidth = destination.width() / scale;
-        float sourceHeight = destination.height() / scale;
-        float sourceLeft = (bitmap.getWidth() - sourceWidth) / 2f;
-        float sourceTop = (bitmap.getHeight() - sourceHeight) / 2f;
-        Rect source = new Rect(
-                Math.round(sourceLeft), Math.round(sourceTop),
-                Math.round(sourceLeft + sourceWidth), Math.round(sourceTop + sourceHeight));
-        canvas.drawBitmap(bitmap, source, destination, imagePaint);
+        float width = bitmap.getWidth() * scale;
+        float height = bitmap.getHeight() * scale;
+        float left = destination.left + (destination.width() - width) / 2f;
+        float top = destination.top + (destination.height() - height) / 2f;
+        canvas.drawBitmap(bitmap, null,
+                new RectF(left, top, left + width, top + height), imagePaint);
     }
 
     private StaticLayout buildLayout(String text, TextPaint paint, int width) {
