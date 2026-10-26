@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 自定义布局：文字与图片各自绝对定位，位置由 padding 在运行时算出（RemoteViews 不能改 margin） -->
+<!-- 自定义布局：文字框 + 最多 4 个图片框，位置/大小由运行时 padding 决定 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -21,7 +21,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical">
 
             <TextView
@@ -38,32 +38,108 @@
                 android:id="@+id/quote_meta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:text="— 孔子 · 《论语》 · 原文"
                 android:textColor="@color/accent"
                 android:textSize="11sp"
-                android:maxLines="3"
+                android:maxLines="2"
                 android:ellipsize="end" />
         </LinearLayout>
     </FrameLayout>
 
     <FrameLayout
-        android:id="@+id/image_wrap"
+        android:id="@+id/image_wrap1"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:visibility="gone">
 
         <ImageView
-            android:id="@+id/quote_image"
-            android:layout_width="78dp"
-            android:layout_height="78dp"
+            android:id="@+id/quote_image1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:scaleType="centerCrop"
             android:visibility="gone"
             android:contentDescription="@null" />
 
         <AdapterViewFlipper
-            android:id="@+id/quote_image_flipper"
-            android:layout_width="78dp"
-            android:layout_height="78dp"
+            android:id="@+id/quote_image_flipper1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="200"
+            android:inAnimation="@android:animator/fade_in"
+            android:outAnimation="@android:animator/fade_out"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/image_wrap2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/quote_image2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <AdapterViewFlipper
+            android:id="@+id/quote_image_flipper2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="200"
+            android:inAnimation="@android:animator/fade_in"
+            android:outAnimation="@android:animator/fade_out"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/image_wrap3"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/quote_image3"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <AdapterViewFlipper
+            android:id="@+id/quote_image_flipper3"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="200"
+            android:inAnimation="@android:animator/fade_in"
+            android:outAnimation="@android:animator/fade_out"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/image_wrap4"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/quote_image4"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <AdapterViewFlipper
+            android:id="@+id/quote_image_flipper4"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:autoStart="true"
             android:flipInterval="200"
             android:inAnimation="@android:animator/fade_in"
@@ -77,6 +153,6 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:text="点按换一句"
-        android:textColor="#776F80"
+        android:textColor="#776F70"
         android:textSize="9sp" />
 </FrameLayout>

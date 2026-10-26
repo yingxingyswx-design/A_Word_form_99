@@ -20,13 +20,19 @@ public class QuoteImageWidgetService extends RemoteViewsService {
 
     static final String EXTRA_FRAMES = "com.example.yiyan.EXTRA_FRAMES";
     static final String EXTRA_BACKGROUND = "com.example.yiyan.EXTRA_BACKGROUND";
+    static final String EXTRA_ROTATION = "com.example.yiyan.EXTRA_ROTATION";
+    static final String EXTRA_FLIP_H = "com.example.yiyan.EXTRA_FLIP_H";
+    static final String EXTRA_FLIP_V = "com.example.yiyan.EXTRA_FLIP_V";
 
     @Override
     public RemoteViewsFactory onGetViewFactory(Intent intent) {
         ArrayList<String> frames = intent == null
                 ? null : intent.getStringArrayListExtra(EXTRA_FRAMES);
         int background = intent == null ? 0 : intent.getIntExtra(EXTRA_BACKGROUND, 0);
-        return new FrameFactory(getApplicationContext(), frames, background);
+        int rotation = intent == null ? 0 : intent.getIntExtra(EXTRA_ROTATION, 0);
+        boolean flipH = intent != null && intent.getBooleanExtra(EXTRA_FLIP_H, false);
+        boolean flipV = intent != null && intent.getBooleanExtra(EXTRA_FLIP_V, false);
+        return new FrameFactory(getApplicationContext(), frames, background, rotation, flipH, flipV);
     }
 
     private static final class FrameFactory implements RemoteViewsFactory {
@@ -37,6 +43,9 @@ public class QuoteImageWidgetService extends RemoteViewsService {
         private final Context context;
         private final ArrayList<String> frames = new ArrayList<>();
         private final int background;
+        private final int rotation;
+        private final boolean flipH;
+        private final boolean flipV;
         private final LinkedHashMap<String, Bitmap> cache = new LinkedHashMap<String, Bitmap>(
                 CACHE_SIZE, 0.75f, true) {
             @Override
@@ -45,9 +54,13 @@ public class QuoteImageWidgetService extends RemoteViewsService {
             }
         };
 
-        FrameFactory(Context context, ArrayList<String> frames, int background) {
+        FrameFactory(Context context, ArrayList<String> frames, int background,
+                     int rotation, boolean flipH, boolean flipV) {
             this.context = context;
             this.background = background;
+            this.rotation = rotation;
+            this.flipH = flipH;
+            this.flipV = flipV;
             if (frames != null) this.frames.addAll(frames);
         }
 
@@ -77,7 +90,8 @@ public class QuoteImageWidgetService extends RemoteViewsService {
             String name = frames.get(position);
             Bitmap bitmap = cache.get(name);
             if (bitmap == null) {
-                bitmap = ImageStore.decode(context, name, ImageStore.WIDGET_MAX_PX);
+                bitmap = ImageStore.decodeTransformed(context, name, ImageStore.WIDGET_MAX_PX,
+                        rotation, flipH, flipV);
                 if (bitmap != null) cache.put(name, bitmap);
             }
             if (bitmap != null) views.setImageViewBitmap(R.id.frame_image, bitmap);

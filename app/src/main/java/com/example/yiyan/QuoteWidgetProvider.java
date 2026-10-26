@@ -39,6 +39,16 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     /** launcher 会在上报的小组件尺寸之外再扣一圈宿主内边距，这里按 dp 估一个值。 */
     private static final int HOST_INSET_DP = 8;
 
+    /** 自定义布局的图片槽位上限：RemoteViews 布局是静态的，只能预先摆好固定数量的槽。 */
+    private static final int MAX_IMAGE_SLOTS = 4;
+    private static final int[] SLOT_WRAP = {
+            R.id.image_wrap1, R.id.image_wrap2, R.id.image_wrap3, R.id.image_wrap4};
+    private static final int[] SLOT_IMAGE = {
+            R.id.quote_image1, R.id.quote_image2, R.id.quote_image3, R.id.quote_image4};
+    private static final int[] SLOT_FLIPPER = {
+            R.id.quote_image_flipper1, R.id.quote_image_flipper2,
+            R.id.quote_image_flipper3, R.id.quote_image_flipper4};
+
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         for (int id : ids) update(context, manager, id);
@@ -110,9 +120,12 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.quote_meta, meta);
         views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
                 prefs.getInt("fontSize", 16));
-        boolean animated = applyImage(context, widgetId, views, quote, background);
+        int animatedMask = 0;
+        boolean animated = false;
         if (custom) {
-            applyCustomLayout(context, manager, widgetId, views, prefs, quote, meta);
+            animatedMask = applyCustomLayout(context, manager, widgetId, views, prefs, background, quote);
+        } else {
+            animated = applyImage(context, widgetId, views, quote, background);
         }
 
         views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);
@@ -126,10 +139,18 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.widget_root, click);
         // 静态图也挂上点击；AdapterViewFlipper 绝对不能 setOnClickListener，
         // AdapterView 会直接抛 "Don't call setOnClickListener for an AdapterView"
-        views.setOnClickPendingIntent(R.id.quote_image, click);
+        if (!custom) {
+            views.setOnClickPendingIntent(R.id.quote_image, click);
+        }
 
         manager.updateAppWidget(widgetId, views);
-        if (animated) {
+        if (custom) {
+            for (int i = 0; i < MAX_IMAGE_SLOTS; i++) {
+                if ((animatedMask & (1 << i)) != 0) {
+                    manager.notifyAppWidgetViewDataChanged(widgetId, SLOT_FLIPPER[i]);
+                }
+            }
+        } else if (animated) {
             manager.notifyAppWidgetViewDataChanged(widgetId, R.id.quote_image_flipper);
         }
     }
@@ -183,65 +204,114 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 自定义布局：文字块与图片块按 0–1 的分数定位。
-     * RemoteViews 改不了 margin，所以用「包装容器 + padding」把固定尺寸的子视图推到目标位置。
+     * 自定义布局：文字框 + 最多 4 个图片框，按场景里的 0–1 分数换算成 padding。
+     * RemoteViews 改不了 margin，padding 会把 match_parent 子视图精确挤成目标矩形。
      *
-     * 尺寸取 OPTION_APPWIDGET_SIZES（真实尺寸），再扣掉 launcher 给 widget 宿主的 inset；
-     * 文字块的纵向位置还要用实际排版高度收敛，否则长句会顶到卡片外面被裁掉。
+     * @return 逐位标记哪些图片槽用了 GIF 轮播（调用方需要在 updateAppWidget 之后 notify）
      */
-    private void applyCustomLayout(Context context, AppWidgetManager manager, int widgetId,
-                                   RemoteViews views, SharedPreferences prefs,
-                                   Quote quote, String meta) {
+    private int applyCustomLayout(Context context, AppWidgetManager manager, int widgetId,
+                                  RemoteViews views, SharedPreferences prefs, int background,
+                                  Quote quote) {
+        CustomScene scene = CustomScene.load(prefs);
         float density = context.getResources().getDisplayMetrics().density;
         int[] sizeDp = widgetSizeDp(manager, widgetId);
-        int widthDp = sizeDp[0];
-        int heightDp = sizeDp[1];
 
         int inset = Math.round(14 * density);
-        // 宿主（launcher）会在 widget 四周再留一点内边距，从上报尺寸里扣掉，避免按最大尺寸排版
         int hostInset = Math.round(HOST_INSET_DP * density);
-        int contentWidth = Math.max(1, Math.round(widthDp * density) - inset * 2 - hostInset);
-        int contentHeight = Math.max(1, Math.round(heightDp * density) - inset * 2 - hostInset);
+        int contentWidth = Math.max(1, Math.round(sizeDp[0] * density) - inset * 2 - hostInset);
+        int contentHeight = Math.max(1, Math.round(sizeDp[1] * density) - inset * 2 - hostInset);
 
-        int textLeft = clampPx(prefs.getFloat("textX", 0.06f) * contentWidth,
-                0, Math.max(0, contentWidth - Math.round(60 * density)));
-        int availableWidth = Math.max(Math.round(40 * density), contentWidth - textLeft);
-        int textBlockHeight = measureTextBlock(context, quote.text, meta,
-                availableWidth, prefs.getInt("fontSize", 16));
-        int textTop = clampPx(prefs.getFloat("textY", 0.06f) * contentHeight,
-                0, Math.max(0, contentHeight - textBlockHeight));
-        views.setViewPadding(R.id.text_wrap, textLeft, textTop, 0, 0);
-        views.setViewVisibility(R.id.text_box,
-                prefs.getBoolean("textBox", false) ? View.VISIBLE : View.GONE);
+        int textLeft = clampPx(scene.text.x * contentWidth, 0, contentWidth - 1);
+        int textTop = clampPx(scene.text.y * contentHeight, 0, contentHeight - 1);
+        int textWidth = clampPx(scene.text.w * contentWidth, Math.round(40 * density),
+                contentWidth - textLeft);
+        int textHeight = clampPx(scene.text.h * contentHeight, Math.round(24 * density),
+                contentHeight - textTop);
+        views.setViewPadding(R.id.text_wrap, textLeft, textTop,
+                Math.max(0, contentWidth - textLeft - textWidth),
+                Math.max(0, contentHeight - textTop - textHeight));
+        views.setViewVisibility(R.id.text_box, scene.textBox ? View.VISIBLE : View.GONE);
+        // 框高固定时，先按可容纳的行数把句子截断，避免出现半行被硬裁的画面
+        views.setTextViewText(R.id.quote_text, fitText(context, quote.text,
+                textWidth, Math.max(0, textHeight - Math.round(30 * density)),
+                prefs.getInt("fontSize", 16)));
 
-        int imageSize = Math.round(78 * density);
-        int maxImageX = Math.max(0, contentWidth - imageSize);
-        int maxImageY = Math.max(0, contentHeight - imageSize);
-        int imageLeft = clampPx(prefs.getFloat("imageX", 0.58f) * contentWidth, 0, maxImageX);
-        int imageTop = clampPx(prefs.getFloat("imageY", 0.18f) * contentHeight, 0, maxImageY);
-        // 子视图尺寸固定为 78dp，这里只需要给出左上角偏移
-        views.setViewPadding(R.id.image_wrap, imageLeft, imageTop, 0, 0);
+        int animatedMask = 0;
+        for (int i = 0; i < MAX_IMAGE_SLOTS; i++) {
+            if (i >= scene.images.size()) {
+                views.setViewVisibility(SLOT_WRAP[i], View.GONE);
+                continue;
+            }
+            CustomScene.ImageBox box = scene.images.get(i);
+            if (!ImageStore.exists(context, box.name)) {
+                views.setViewVisibility(SLOT_WRAP[i], View.GONE);
+                continue;
+            }
+
+            int left = clampPx(box.x * contentWidth, 0, contentWidth - 1);
+            int top = clampPx(box.y * contentHeight, 0, contentHeight - 1);
+            int width = clampPx(box.w * contentWidth, Math.round(24 * density), contentWidth - left);
+            int height = clampPx(box.h * contentHeight, Math.round(24 * density), contentHeight - top);
+            views.setViewVisibility(SLOT_WRAP[i], View.VISIBLE);
+            views.setViewPadding(SLOT_WRAP[i], left, top,
+                    Math.max(0, contentWidth - left - width),
+                    Math.max(0, contentHeight - top - height));
+
+            List<String> frames = ImageStore.frameNames(context, box.name);
+            if (frames.size() > 1) {
+                Bitmap first = ImageStore.decodeTransformed(context, frames.get(0),
+                        ImageStore.WIDGET_MAX_PX, box.rotation, box.flipH, box.flipV);
+                if (first != null) {
+                    views.setImageViewBitmap(SLOT_IMAGE[i], first);
+                    views.setViewVisibility(SLOT_IMAGE[i], View.VISIBLE);
+                } else {
+                    views.setViewVisibility(SLOT_IMAGE[i], View.GONE);
+                }
+
+                Intent adapter = new Intent(context, QuoteImageWidgetService.class);
+                // data 参与 RemoteViewsService 的工厂缓存 key，槽位与变换都要带进去
+                adapter.setData(Uri.parse("slot://" + i + "/" + box.name + "/"
+                        + box.rotation + "/" + box.flipH + "/" + box.flipV));
+                adapter.putStringArrayListExtra(QuoteImageWidgetService.EXTRA_FRAMES,
+                        new ArrayList<>(frames));
+                adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, background);
+                adapter.putExtra(QuoteImageWidgetService.EXTRA_ROTATION, box.rotation);
+                adapter.putExtra(QuoteImageWidgetService.EXTRA_FLIP_H, box.flipH);
+                adapter.putExtra(QuoteImageWidgetService.EXTRA_FLIP_V, box.flipV);
+                views.setRemoteAdapter(widgetId, SLOT_FLIPPER[i], adapter);
+                views.setViewVisibility(SLOT_FLIPPER[i], View.VISIBLE);
+                animatedMask |= 1 << i;
+            } else {
+                views.setViewVisibility(SLOT_FLIPPER[i], View.GONE);
+                Bitmap bitmap = ImageStore.decodeTransformed(context, box.name,
+                        ImageStore.WIDGET_MAX_PX, box.rotation, box.flipH, box.flipV);
+                if (bitmap != null) {
+                    views.setImageViewBitmap(SLOT_IMAGE[i], bitmap);
+                    views.setViewVisibility(SLOT_IMAGE[i], View.VISIBLE);
+                } else {
+                    views.setViewVisibility(SLOT_IMAGE[i], View.GONE);
+                }
+            }
+        }
+        return animatedMask;
     }
 
-    /** 用和布局相同的字号/宽度估算文字块高度，供纵向收敛使用。 */
-    private int measureTextBlock(Context context, String text, String meta, int width, int fontSizeSp) {
-        float scaled = context.getResources().getDisplayMetrics().scaledDensity;
-        TextPaint quotePaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
-        quotePaint.setTextSize(fontSizeSp * scaled);
-        StaticLayout body = StaticLayout.Builder.obtain(text, 0, text.length(), quotePaint, width)
+    /** 按框宽与可用高度把句子截到整数行，避免半行被裁。 */
+    private String fitText(Context context, String text, int widthPx, int maxHeightPx, int fontSizeSp) {
+        if (text == null || widthPx <= 0 || maxHeightPx <= 0) return text;
+        TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+        paint.setTextSize(fontSizeSp * context.getResources().getDisplayMetrics().scaledDensity);
+        StaticLayout layout = StaticLayout.Builder.obtain(text, 0, text.length(), paint, widthPx)
                 .setMaxLines(8)
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .build();
-
-        TextPaint metaPaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
-        metaPaint.setTextSize(11 * scaled);
-        StaticLayout metaLayout = StaticLayout.Builder.obtain(meta, 0, meta.length(), metaPaint, width)
-                .setMaxLines(3)
-                .setEllipsize(TextUtils.TruncateAt.END)
-                .build();
-
-        return body.getHeight() + metaLayout.getHeight()
-                + Math.round(6 * context.getResources().getDisplayMetrics().density);
+        if (layout.getLineCount() == 0) return text;
+        int lineHeight = layout.getLineBottom(0) - layout.getLineTop(0);
+        if (lineHeight <= 0) return text;
+        int maxLines = Math.max(1, maxHeightPx / lineHeight);
+        if (layout.getLineCount() <= maxLines) return text;
+        int end = layout.getLineEnd(Math.min(maxLines, layout.getLineCount()) - 1);
+        return text.substring(0, Math.max(0, end - 1)).trim() + "…";
     }
 
     /** 优先用 API 31+ 的 OPTION_APPWIDGET_SIZES（真实尺寸），否则退回 min 尺寸。 */

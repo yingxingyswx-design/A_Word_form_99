@@ -37,12 +37,22 @@ public class Quote {
         String[] fields = line.split("\\|", -1);
         String textPart = fields.length > 0 ? fields[0].trim() : "";
         if (textPart.isEmpty()) return null;
-        String authorPart = fields.length > 1 ? fields[1].trim() : "";
-        String workPart = fields.length > 2 ? fields[2].trim() : "";
+        String authorPart = clean(fields.length > 1 ? fields[1] : "");
+        String workPart = clean(fields.length > 2 ? fields[2] : "");
         String categoryPart = fields.length > 3 && !fields[3].trim().isEmpty()
                 ? fields[3].trim() : defaultCategory;
-        String imagePart = fields.length > 4 ? fields[4].trim() : "";
+        String imagePart = fields.length > 4 ? clean(fields[4]) : "";
         return new Quote(textPart, authorPart, workPart, kind, categoryPart, imagePart);
+    }
+
+    /**
+     * 老版本在作者/出处为 null 时直接字符串拼接，把字面量 "null" 写进了存储。
+     * 这里统一当成空值，免得小组件上出现 “— null · 《null》”。
+     */
+    private static String clean(String value) {
+        if (value == null) return "";
+        String trimmed = value.trim();
+        return "null".equalsIgnoreCase(trimmed) ? "" : trimmed;
     }
 
     /** 序列化成存储行；空字段留空，例如 {@code 人生如逆旅|||感悟} 或 {@code 句子|作者|出处|分类|abc.gif}。 */

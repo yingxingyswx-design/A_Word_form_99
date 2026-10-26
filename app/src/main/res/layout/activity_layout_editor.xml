@@ -3,13 +3,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="12dp">
 
     <TextView
+        android:id="@+id/editor_hint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="拖动文字块或图片块调整位置；坐标按比例保存，换到不同尺寸的小组件上也会保持一致。"
-        android:textSize="13sp" />
+        android:text="拖动框体移动，拖右下角改大小；文字与图片不允许重叠"
+        android:textSize="12sp" />
 
     <com.example.yiyan.LayoutCanvasView
         android:id="@+id/layout_canvas"
@@ -17,11 +18,32 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <Switch
-        android:id="@+id/text_box"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="文字以框形式显示（圆角描边）" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_add_image"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="添加图片" />
+
+        <Button
+            android:id="@+id/btn_delete"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="删除" />
+
+        <Button
+            android:id="@+id/btn_rotate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="旋转 90°" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -29,14 +51,75 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/reset_layout"
+            android:id="@+id/btn_flip_h"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="水平镜像" />
+
+        <Button
+            android:id="@+id/btn_flip_v"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="垂直镜像" />
+
+        <Switch
+            android:id="@+id/sw_text_box"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="文字框" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_width_minus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="宽 -" />
+
+        <Button
+            android:id="@+id/btn_width_plus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="宽 +" />
+
+        <Button
+            android:id="@+id/btn_height_minus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="高 -" />
+
+        <Button
+            android:id="@+id/btn_height_plus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="高 +" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_reset"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="恢复默认" />
 
         <Button
-            android:id="@+id/save_layout"
+            android:id="@+id/btn_save"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

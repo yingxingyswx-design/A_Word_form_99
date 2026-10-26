@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Movie;
 import android.net.Uri;
 import android.util.Log;
@@ -279,8 +280,7 @@ final class ImageStore {
     /**
      * 解码成位图并限制最长边不超过 {@code maxPx}。GIF 得到首帧（帧文件请直接用文件名解码）。
      */
-    static Bitmap decode(Context context, String name, int maxPx) {
-        File file = resolve(context, name);
+    static Bitmap decode(Context context, String name, int maxPx) {        File file = resolve(context, name);
         if (file == null || !file.isFile()) return null;
         try {
             BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -314,6 +314,27 @@ final class ImageStore {
         } catch (OutOfMemoryError e) {
             Log.w(TAG, "配图过大，内存不足：" + name);
             return null;
+        }
+    }
+
+    /** 解码并按旋转 / 镜像变换（旋转 90/180/270 时宽高对调）。 */
+    static Bitmap decodeTransformed(Context context, String name, int maxPx,
+                                    int rotation, boolean flipH, boolean flipV) {
+        Bitmap source = decode(context, name, maxPx);
+        if (source == null) return null;
+        int normalized = ((rotation % 360) + 360) % 360;
+        if (normalized == 0 && !flipH && !flipV) return source;
+        try {
+            Matrix matrix = new Matrix();
+            matrix.postScale(flipH ? -1f : 1f, flipV ? -1f : 1f);
+            matrix.postRotate(normalized);
+            Bitmap transformed = Bitmap.createBitmap(source, 0, 0,
+                    source.getWidth(), source.getHeight(), matrix, true);
+            if (transformed != source) source.recycle();
+            return transformed;
+        } catch (Exception e) {
+            Log.w(TAG, "变换配图失败：" + name, e);
+            return source;
         }
     }
 
