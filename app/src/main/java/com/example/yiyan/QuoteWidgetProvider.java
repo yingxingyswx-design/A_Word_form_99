@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
@@ -69,13 +70,6 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 .apply();
         Log.i(TAG, (random ? "随机" : "顺序") + "切换到第" + index + "条：" + quote.text);
 
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_quote);
-        views.setTextViewText(R.id.quote_text, quote.text);
-        views.setTextViewText(R.id.quote_meta, meta(quote));
-        views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
-                prefs.getInt("fontSize", 16));
-        applyImage(context, views, quote);
-
         boolean night = (context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         int accent = prefs.getInt("themeColor", 0xff6750a4);
@@ -83,34 +77,80 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             accent = context.getColor(android.R.color.system_accent1_600);
         }
         if (night) accent = 0xffd0bcff;
+        int background = night ? 0xff211f24 : prefs.getInt("backgroundColor", 0xfffff9f0);
+
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_quote);
+        views.setTextViewText(R.id.quote_text, quote.text);
+        views.setTextViewText(R.id.quote_meta, meta(quote));
+        views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
+                prefs.getInt("fontSize", 16));
+        boolean animated = applyImage(context, widgetId, views, quote, background);
 
         views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);
         views.setTextColor(R.id.quote_meta, accent);
-        views.setInt(R.id.widget_root, "setBackgroundColor",
-                night ? 0xff211f24 : prefs.getInt("backgroundColor", 0xfffff9f0));
+        views.setInt(R.id.widget_root, "setBackgroundColor", background);
 
         Intent next = new Intent(ACTION).setPackage(context.getPackageName());
-        views.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getBroadcast(
+        PendingIntent click = PendingIntent.getBroadcast(
                 context, widgetId, next,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.widget_root, click);
+        // 图片区域也要能换一句，否则点到图上是死的
+        views.setOnClickPendingIntent(R.id.quote_image, click);
+        views.setOnClickPendingIntent(R.id.quote_image_flipper, click);
 
         manager.updateAppWidget(widgetId, views);
+        if (animated) {
+            manager.notifyAppWidgetViewDataChanged(widgetId, R.id.quote_image_flipper);
+        }
     }
 
     /**
-     * 配图渲染在右侧。RemoteViews 不支持动图，GIF 只能取首帧；
-     * 位图必须压到 {@link ImageStore#WIDGET_MAX_PX}，否则单次 RemoteViews 会超过 Binder 限制。
+     * 右侧配图。GIF 会拆成帧文件交给 AdapterViewFlipper，由桌面自己翻页；
+     * 同时把首帧设成静态图垫底，遇到不支持集合控件的桌面也还能看到图。
+     *
+     * @return true 表示这次用的是逐帧轮播，调用方需要通知集合数据刷新
      */
-    private void applyImage(Context context, RemoteViews views, Quote quote) {
-        Bitmap bitmap = quote.hasImage()
-                ? ImageStore.decode(context, quote.imagePath, ImageStore.WIDGET_MAX_PX)
-                : null;
+    private boolean applyImage(Context context, int widgetId, RemoteViews views, Quote quote, int background) {
+        if (!quote.hasImage()) {
+            views.setViewVisibility(R.id.quote_image, View.GONE);
+            views.setViewVisibility(R.id.quote_image_flipper, View.GONE);
+            return false;
+        }
+
+        List<String> frames = ImageStore.frameNames(context, quote.imagePath);
+        if (frames.size() > 1) {
+            Bitmap firstFrame = ImageStore.decode(context, frames.get(0), ImageStore.WIDGET_MAX_PX);
+            if (firstFrame != null) {
+                views.setImageViewBitmap(R.id.quote_image, firstFrame);
+                views.setViewVisibility(R.id.quote_image, View.VISIBLE);
+            } else {
+                views.setViewVisibility(R.id.quote_image, View.GONE);
+            }
+
+            Intent adapter = new Intent(context, QuoteImageWidgetService.class);
+            // data 参与 RemoteViewsService 的工厂缓存 key，必须带上，否则不同条目会复用同一组帧
+            adapter.setData(Uri.parse("frames://" + quote.imagePath));
+            adapter.putStringArrayListExtra(QuoteImageWidgetService.EXTRA_FRAMES,
+                    new ArrayList<>(frames));
+            // 逐帧图的透明区域要垫成小组件背景色，否则会透出下面的静态首帧
+            adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, background);
+            views.setRemoteAdapter(widgetId, R.id.quote_image_flipper, adapter);
+            // 翻页间隔固定在布局里（android:flipInterval），不用 setInt 反射调用，
+            // 免得某些 launcher 因方法不可远程调用而丢弃整份 RemoteViews
+            views.setViewVisibility(R.id.quote_image_flipper, View.VISIBLE);
+            return true;
+        }
+
+        views.setViewVisibility(R.id.quote_image_flipper, View.GONE);
+        Bitmap bitmap = ImageStore.decode(context, quote.imagePath, ImageStore.WIDGET_MAX_PX);
         if (bitmap == null) {
             views.setViewVisibility(R.id.quote_image, View.GONE);
-            return;
+            return false;
         }
         views.setViewVisibility(R.id.quote_image, View.VISIBLE);
         views.setImageViewBitmap(R.id.quote_image, bitmap);
+        return false;
     }
 
     /**

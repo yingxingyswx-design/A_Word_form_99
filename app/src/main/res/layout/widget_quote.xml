@@ -48,12 +48,29 @@
             android:gravity="right" />
     </LinearLayout>
 
-    <ImageView
-        android:id="@+id/quote_image"
+    <FrameLayout
         android:layout_width="78dp"
         android:layout_height="match_parent"
-        android:layout_marginStart="10dp"
-        android:scaleType="centerCrop"
-        android:visibility="gone"
-        android:contentDescription="@null" />
+        android:layout_marginStart="10dp">
+
+        <!-- 静态图；GIF 时它作为首帧垫底，桌面不支持集合控件也至少能显示一帧 -->
+        <ImageView
+            android:id="@+id/quote_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <!-- GIF 逐帧轮播，由桌面按 flipInterval 自己翻页 -->
+        <AdapterViewFlipper
+            android:id="@+id/quote_image_flipper"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="200"
+            android:inAnimation="@android:anim/fade_in"
+            android:outAnimation="@android:anim/fade_out"
+            android:visibility="gone" />
+    </FrameLayout>
 </LinearLayout>

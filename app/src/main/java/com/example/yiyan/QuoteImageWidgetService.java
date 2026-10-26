@@ -1,0 +1,110 @@
+package com.example.yiyan;
+
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.widget.RemoteViews;
+import android.widget.RemoteViewsService;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * 给小组件里的 AdapterViewFlipper 提供逐帧视图。
+ *
+ * 桌面自己按 flipInterval 翻页，不需要应用进程反复发更新广播。
+ * 帧文件由 {@link ImageStore#extractFrames} 从 GIF 拆出来；这里只负责解码成位图。
+ */
+public class QuoteImageWidgetService extends RemoteViewsService {
+
+    static final String EXTRA_FRAMES = "com.example.yiyan.EXTRA_FRAMES";
+    static final String EXTRA_BACKGROUND = "com.example.yiyan.EXTRA_BACKGROUND";
+
+    @Override
+    public RemoteViewsFactory onGetViewFactory(Intent intent) {
+        ArrayList<String> frames = intent == null
+                ? null : intent.getStringArrayListExtra(EXTRA_FRAMES);
+        int background = intent == null ? 0 : intent.getIntExtra(EXTRA_BACKGROUND, 0);
+        return new FrameFactory(getApplicationContext(), frames, background);
+    }
+
+    private static final class FrameFactory implements RemoteViewsFactory {
+
+        /** 帧位图很小（<=240px），留几帧避免每次翻页都重新解码。 */
+        private static final int CACHE_SIZE = 6;
+
+        private final Context context;
+        private final ArrayList<String> frames = new ArrayList<>();
+        private final int background;
+        private final LinkedHashMap<String, Bitmap> cache = new LinkedHashMap<String, Bitmap>(
+                CACHE_SIZE, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Bitmap> eldest) {
+                return size() > CACHE_SIZE;
+            }
+        };
+
+        FrameFactory(Context context, ArrayList<String> frames, int background) {
+            this.context = context;
+            this.background = background;
+            if (frames != null) this.frames.addAll(frames);
+        }
+
+        @Override
+        public void onCreate() {
+        }
+
+        @Override
+        public void onDataSetChanged() {
+            cache.clear();
+        }
+
+        @Override
+        public void onDestroy() {
+            cache.clear();
+        }
+
+        @Override
+        public int getCount() {
+            return frames.size();
+        }
+
+        @Override
+        public RemoteViews getViewAt(int position) {
+            if (position < 0 || position >= frames.size()) return null;
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_image_frame);
+            String name = frames.get(position);
+            Bitmap bitmap = cache.get(name);
+            if (bitmap == null) {
+                bitmap = ImageStore.decode(context, name, ImageStore.WIDGET_MAX_PX);
+                if (bitmap != null) cache.put(name, bitmap);
+            }
+            if (bitmap != null) views.setImageViewBitmap(R.id.frame_image, bitmap);
+            if (background != 0) {
+                views.setInt(R.id.frame_root, "setBackgroundColor", background);
+            }
+            return views;
+        }
+
+        @Override
+        public RemoteViews getLoadingView() {
+            return null;
+        }
+
+        @Override
+        public int getViewTypeCount() {
+            return 1;
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public boolean hasStableIds() {
+            return false;
+        }
+    }
+}

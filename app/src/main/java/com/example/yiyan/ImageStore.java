@@ -3,12 +3,21 @@ package com.example.yiyan;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Movie;
 import android.net.Uri;
+import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -18,13 +27,24 @@ import java.util.UUID;
  * 用户通过系统文件选择器（SAF）挑图后立刻把字节复制到应用私有目录，
  * 之后只记文件名。这样不依赖可以随时失效的 content:// 授权，
  * 桌面进程也能在任意时刻读到文件。
+ *
+ * GIF 额外拆成逐帧 PNG（{@code <base>_f00.png} …），并写一份 {@code <base>.meta}
+ * 记录帧数与间隔——RemoteViews 不能播放动图，桌面小组件靠 AdapterViewFlipper
+ * 在这些帧文件之间自动翻页。
  */
 final class ImageStore {
 
+    private static final String TAG = "99YIYAN_LOG";
     private static final String DIR = "quote_images";
     private static final long MAX_BYTES = 16L * 1024 * 1024;
     /** 小组件单次 RemoteViews 有 Binder 体积限制，解码后的位图必须压到这个尺寸以内。 */
     static final int WIDGET_MAX_PX = 240;
+    /** 帧文件按最长边存这个尺寸，桌面再按需缩放。 */
+    static final int FRAME_MAX_PX = 180;
+    /** 桌面翻页间隔，必须和 widget_quote.xml 里的 android:flipInterval 保持一致。 */
+    static final int FRAME_INTERVAL_MS = 200;
+    /** 帧数上限：帧越多，桌面每次翻页要搬运的位图越多。 */
+    static final int MAX_FRAMES = 20;
 
     private ImageStore() {
     }
@@ -32,7 +52,7 @@ final class ImageStore {
     static File dir(Context context) {
         File dir = new File(context.getFilesDir(), DIR);
         if (!dir.exists() && !dir.mkdirs()) {
-            android.util.Log.w("99YIYAN_LOG", "无法创建配图目录：" + dir);
+            Log.w(TAG, "无法创建配图目录：" + dir);
         }
         return dir;
     }
@@ -72,7 +92,7 @@ final class ImageStore {
             while ((read = in.read(buffer)) > 0) {
                 total += read;
                 if (total > MAX_BYTES) {
-                    android.util.Log.w("99YIYAN_LOG", "配图超过 16MB，已放弃");
+                    Log.w(TAG, "配图超过 16MB，已放弃");
                     closeQuietly(out);
                     out = null;
                     target.delete();
@@ -83,7 +103,7 @@ final class ImageStore {
             out.flush();
             return name;
         } catch (Exception e) {
-            android.util.Log.w("99YIYAN_LOG", "导入配图失败", e);
+            Log.w(TAG, "导入配图失败", e);
             if (target != null) target.delete();
             return null;
         } finally {
@@ -95,7 +115,21 @@ final class ImageStore {
     static void delete(Context context, String name) {
         File file = resolve(context, name);
         if (file != null && file.isFile() && !file.delete()) {
-            android.util.Log.w("99YIYAN_LOG", "删除配图失败：" + file);
+            Log.w(TAG, "删除配图失败：" + file);
+        }
+    }
+
+    /** 删除配图本身、它的 meta 与所有帧文件。 */
+    static void deleteWithFrames(Context context, String name) {
+        if (name == null || name.trim().isEmpty()) return;
+        File dir = dir(context);
+        String base = baseName(name);
+        delete(context, name);
+        File meta = new File(dir, base + ".meta");
+        if (meta.isFile()) meta.delete();
+        for (String frame : frameFileNames(base, MAX_FRAMES)) {
+            File file = new File(dir, frame);
+            if (file.isFile()) file.delete();
         }
     }
 
@@ -104,8 +138,109 @@ final class ImageStore {
     }
 
     /**
-     * 解码成位图并限制最长边不超过 {@code maxPx}。GIF 只会得到首帧
-     * —— RemoteViews 不支持动图，管理页里的动图预览另走 ImageDecoder。
+     * 把 GIF 拆成逐帧 PNG，并写 meta（帧数 / 帧间隔）。已经是静态图或拆不出两帧时返回 0。
+     * 用已废弃的 {@link Movie} 解码 GIF —— 它是系统里唯一能按时间取帧的公开 API。
+     */
+    static int extractFrames(Context context, String imageName) {
+        if (!isGif(imageName)) return 0;
+        File gif = resolve(context, imageName);
+        if (gif == null || !gif.isFile()) return 0;
+
+        Movie movie;
+        try {
+            movie = Movie.decodeFile(gif.getPath());
+        } catch (Throwable t) {
+            Log.w(TAG, "GIF 解码失败：" + imageName, t);
+            return 0;
+        }
+        if (movie == null || movie.width() <= 0 || movie.height() <= 0) return 0;
+
+        int duration = movie.duration();
+        if (duration <= 0) duration = 900;
+        // 帧数与时长成比例，配合固定的翻页间隔让播放速度尽量接近原 GIF
+        int count = Math.min(MAX_FRAMES,
+                Math.max(2, Math.round((float) duration / FRAME_INTERVAL_MS)));
+        int interval = FRAME_INTERVAL_MS;
+
+        String base = baseName(imageName);
+        File dir = dir(context);
+        float scale = Math.min(1f, (float) FRAME_MAX_PX / Math.max(movie.width(), movie.height()));
+        int width = Math.max(1, Math.round(movie.width() * scale));
+        int height = Math.max(1, Math.round(movie.height() * scale));
+
+        for (int i = 0; i < count; i++) {
+            movie.setTime((int) ((long) duration * i / count));
+            Bitmap frame = null;
+            OutputStream out = null;
+            try {
+                frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(frame);
+                canvas.scale(scale, scale);
+                movie.draw(canvas, 0, 0);
+                out = new FileOutputStream(new File(dir, frameName(base, i)));
+                frame.compress(Bitmap.CompressFormat.PNG, 100, out);
+                out.flush();
+            } catch (Exception e) {
+                Log.w(TAG, "拆帧失败：" + imageName + " #" + i, e);
+                deleteWithFrames(context, imageName);
+                return 0;
+            } finally {
+                closeQuietly(out);
+                if (frame != null) frame.recycle();
+            }
+        }
+
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter(new File(dir, base + ".meta"));
+            writer.write(count + "\n" + interval + "\n");
+        } catch (Exception e) {
+            Log.w(TAG, "写 GIF 帧信息失败", e);
+            deleteWithFrames(context, imageName);
+            return 0;
+        } finally {
+            closeQuietly(writer);
+        }
+        return count;
+    }
+
+    /** @return {@code [帧数, 帧间隔毫秒]}；没有拆过帧时返回 {@code [0, 150]}。 */
+    static int[] readFrameInfo(Context context, String imageName) {
+        if (imageName == null || imageName.trim().isEmpty()) return new int[]{0, 150};
+        File meta = new File(dir(context), baseName(imageName) + ".meta");
+        if (!meta.isFile()) return new int[]{0, 150};
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(meta), "UTF-8"));
+            int count = Integer.parseInt(reader.readLine().trim());
+            int interval = Integer.parseInt(reader.readLine().trim());
+            return new int[]{count, Math.max(60, Math.min(600, interval))};
+        } catch (Exception e) {
+            return new int[]{0, 150};
+        } finally {
+            closeQuietly(reader);
+        }
+    }
+
+    /** 该配图可用于轮播的帧文件名；不足两帧或文件缺失时返回空列表。 */
+    static List<String> frameNames(Context context, String imageName) {
+        if (imageName == null || imageName.trim().isEmpty()) return Collections.emptyList();
+        int count = readFrameInfo(context, imageName)[0];
+        if (count < 2) return Collections.emptyList();
+
+        String base = baseName(imageName);
+        File dir = dir(context);
+        ArrayList<String> names = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            String frame = frameName(base, i);
+            if (!new File(dir, frame).isFile()) return Collections.emptyList();
+            names.add(frame);
+        }
+        return names;
+    }
+
+    /**
+     * 解码成位图并限制最长边不超过 {@code maxPx}。GIF 得到首帧（帧文件请直接用文件名解码）。
      */
     static Bitmap decode(Context context, String name, int maxPx) {
         File file = resolve(context, name);
@@ -137,12 +272,28 @@ final class ImageStore {
             }
             return bitmap;
         } catch (Exception e) {
-            android.util.Log.w("99YIYAN_LOG", "解码配图失败：" + name, e);
+            Log.w(TAG, "解码配图失败：" + name, e);
             return null;
         } catch (OutOfMemoryError e) {
-            android.util.Log.w("99YIYAN_LOG", "配图过大，内存不足：" + name);
+            Log.w(TAG, "配图过大，内存不足：" + name);
             return null;
         }
+    }
+
+    private static String frameName(String base, int index) {
+        return String.format(Locale.ROOT, "%s_f%02d.png", base, index);
+    }
+
+    private static List<String> frameFileNames(String base, int max) {
+        ArrayList<String> names = new ArrayList<>(max);
+        for (int i = 0; i < max; i++) names.add(frameName(base, i));
+        return names;
+    }
+
+    static String baseName(String name) {
+        if (name == null) return "";
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
     }
 
     private static String extensionFor(String mime, Uri uri) {
@@ -157,7 +308,7 @@ final class ImageStore {
         // getType() 偶尔为 null，退而看路径后缀
         String path = uri.getPath() == null ? "" : uri.getPath().toLowerCase(Locale.ROOT);
         for (String ext : new String[]{".gif", ".png", ".webp", ".jpg", ".jpeg", ".bmp", ".heic"}) {
-            if (path.endsWith(ext)) return ".jpg".equals(ext) ? ".jpg" : ext;
+            if (path.endsWith(ext)) return ext;
         }
         return ".img";
     }

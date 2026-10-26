@@ -299,7 +299,7 @@ public class ManageQuotesActivity extends Activity {
             stopPreviewAnimation();
             // 只是挑了图没保存：把刚拷贝进来的文件删掉，避免垃圾文件
             if (!editSaved && !editImagePath.isEmpty() && !editImagePath.equals(editOldImagePath)) {
-                ImageStore.delete(this, editImagePath);
+                ImageStore.deleteWithFrames(this, editImagePath);
             }
             editDialog = null;
             editPreview = null;
@@ -313,7 +313,7 @@ public class ManageQuotesActivity extends Activity {
                 return;
             }
             if (!editImagePath.equals(editOldImagePath) && !editOldImagePath.isEmpty()) {
-                ImageStore.delete(this, editOldImagePath);
+                ImageStore.deleteWithFrames(this, editOldImagePath);
             }
             String newCategory = category.getText().toString().trim();
             items.set(editIndex, new Quote(newText,
@@ -349,7 +349,7 @@ public class ManageQuotesActivity extends Activity {
             String previous = editImagePath;
             editImagePath = "";
             if (!previous.isEmpty() && !previous.equals(editOldImagePath)) {
-                ImageStore.delete(this, previous);
+                ImageStore.deleteWithFrames(this, previous);
             }
             refreshPreview();
         });
@@ -395,7 +395,15 @@ public class ManageQuotesActivity extends Activity {
         String previous = editImagePath;
         editImagePath = imported;
         if (!previous.isEmpty() && !previous.equals(editOldImagePath)) {
-            ImageStore.delete(this, previous);
+            ImageStore.deleteWithFrames(this, previous);
+        }
+        if (ImageStore.isGif(imported)) {
+            int frames = ImageStore.extractFrames(this, imported);
+            Toast.makeText(this,
+                    frames > 1
+                            ? "GIF 已拆成 " + frames + " 帧，桌面小组件会循环播放"
+                            : "这个 GIF 拆不出多帧，桌面只显示首帧",
+                    frames > 1 ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
         }
         refreshPreview();
     }
@@ -419,7 +427,10 @@ public class ManageQuotesActivity extends Activity {
                     ((AnimatedImageDrawable) drawable).setRepeatCount(AnimatedImageDrawable.REPEAT_INFINITE);
                     ((AnimatedImageDrawable) drawable).start();
                 }
-                editStatus.setText("GIF 已选：这里显示动画，桌面小组件只显示首帧");
+                int[] info = ImageStore.readFrameInfo(this, editImagePath);
+                editStatus.setText(info[0] > 1
+                        ? "GIF 已拆成 " + info[0] + " 帧，桌面每 " + info[1] + " ms 轮播（此处预览动画）"
+                        : "GIF 未能拆帧，桌面只显示首帧（此处可预览动画）");
                 return;
             } catch (Exception ignored) {
                 // 解码失败就退回静态首帧
@@ -428,8 +439,14 @@ public class ManageQuotesActivity extends Activity {
         Bitmap bitmap = ImageStore.decode(this, editImagePath, 640);
         if (bitmap != null) {
             editPreview.setImageBitmap(bitmap);
-            editStatus.setText(ImageStore.isGif(editImagePath)
-                    ? "GIF 已选：桌面小组件只显示首帧" : "已选择图片");
+            int[] info = ImageStore.readFrameInfo(this, editImagePath);
+            if (ImageStore.isGif(editImagePath)) {
+                editStatus.setText(info[0] > 1
+                        ? "GIF 已拆成 " + info[0] + " 帧，桌面每 " + info[1] + " ms 轮播"
+                        : "GIF 未能拆帧，桌面只显示首帧");
+            } else {
+                editStatus.setText("已选择图片");
+            }
         } else {
             editPreview.setImageDrawable(null);
             editStatus.setText("图片读取失败");
