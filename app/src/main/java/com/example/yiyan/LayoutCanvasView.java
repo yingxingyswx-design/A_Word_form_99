@@ -1,6 +1,7 @@
 package com.example.yiyan;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
@@ -56,6 +57,12 @@ public class LayoutCanvasView extends View {
 
     private float downX, downY;
     private RectF dragOrigin;
+
+    /** 玻璃背景缓存：尺寸或参数变了才重渲染。 */
+    private Bitmap glassBitmap;
+    private int glassWidth;
+    private int glassHeight;
+    private String glassSignature;
 
     public LayoutCanvasView(Context context) {
         this(context, null);
@@ -129,14 +136,55 @@ public class LayoutCanvasView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         computeContentRect();
+        applyGlassPalette();
 
-        canvas.drawRoundRect(widgetRect, dp(18), dp(18), backgroundPaint);
+        drawBackground(canvas);
 
         drawText(canvas);
         for (int i = 0; i < scene.images.size(); i++) {
             drawImage(canvas, i);
         }
         drawSelection(canvas);
+    }
+
+    /** 与桌面一致：开液态玻璃时画玻璃层，否则画纯色圆角底。 */
+    private void drawBackground(Canvas canvas) {
+        SharedPreferences prefs = prefs();
+        if (!GlassRenderer.enabled(prefs)) {
+            canvas.drawRoundRect(widgetRect, dp(18), dp(18), backgroundPaint);
+            return;
+        }
+        int w = Math.max(1, Math.round(widgetRect.width()));
+        int h = Math.max(1, Math.round(widgetRect.height()));
+        GlassRenderer.Spec spec = GlassRenderer.spec(getContext(), prefs);
+        String signature = spec.blur + "/" + spec.density + "/" + spec.highlight
+                + "/" + spec.cornerDp + "/" + spec.dark;
+        if (glassBitmap == null || glassWidth != w || glassHeight != h
+                || !signature.equals(glassSignature)) {
+            if (glassBitmap != null) glassBitmap.recycle();
+            glassBitmap = GlassRenderer.render(getContext(), w, h, spec,
+                    WallpaperSource.load(getContext(), 720));
+            glassWidth = w;
+            glassHeight = h;
+            glassSignature = signature;
+        }
+        canvas.drawBitmap(glassBitmap, null, widgetRect, imagePaint);
+    }
+
+    private void applyGlassPalette() {
+        SharedPreferences prefs = prefs();
+        if (GlassRenderer.enabled(prefs)) {
+            GlassRenderer.Spec spec = GlassRenderer.spec(getContext(), prefs);
+            textPaint.setColor(GlassRenderer.textColor(spec));
+            metaPaint.setColor(GlassRenderer.metaColor(spec));
+        } else {
+            textPaint.setColor(getResources().getColor(R.color.ink, getContext().getTheme()));
+            metaPaint.setColor(getResources().getColor(R.color.accent, getContext().getTheme()));
+        }
+    }
+
+    private SharedPreferences prefs() {
+        return getContext().getSharedPreferences("settings", 0);
     }
 
     private void computeContentRect() {

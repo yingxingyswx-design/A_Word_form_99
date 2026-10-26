@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -161,17 +162,54 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.quote_meta, meta);
         views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
                 prefs.getInt("fontSize", 16));
+
+        // 液态玻璃：根背景转透明，让壁纸从玻璃层下面透出来；玻璃位图按小组件实际尺寸现渲染
+        float density = context.getResources().getDisplayMetrics().density;
+        int[] sizeDp = widgetSizeDp(manager, widgetId);
+        GlassRenderer.Spec glassSpec = GlassRenderer.enabled(prefs)
+                ? GlassRenderer.spec(context, prefs) : null;
+        int frameBackground = background;
+        if (glassSpec != null) {
+            // 壁纸三色用来还原「被模糊掉的背景」；光源方位按句子散列轻微变化
+            int[] wallpaperColors = GlassRenderer.wallpaperColors(context);
+            glassSpec.tint = wallpaperColors[0];
+            glassSpec.tint2 = wallpaperColors[1];
+            glassSpec.tint3 = wallpaperColors[2];
+            glassSpec.light = (Math.abs(quote.text.hashCode()) % 1000) / 1000f;
+            Log.i(TAG, "液态玻璃 " + sizeDp[0] + "x" + sizeDp[1] + "dp tone="
+                    + (glassSpec.dark ? "dark" : "light")
+                    + " blur=" + Math.round(glassSpec.blur * 100)
+                    + " density=" + Math.round(glassSpec.density * 100));
+            Bitmap glassBitmap = GlassRenderer.render(context,
+                    Math.round(sizeDp[0] * density), Math.round(sizeDp[1] * density),
+                    glassSpec, null);
+            views.setImageViewBitmap(R.id.glass_bg, glassBitmap);
+            views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
+            frameBackground = GlassRenderer.solidFill(glassSpec);
+        } else {
+            views.setViewVisibility(R.id.glass_bg, View.GONE);
+        }
+
         int animatedMask = 0;
         boolean animated = false;
         if (custom) {
-            animatedMask = applyCustomLayout(context, manager, widgetId, views, prefs, background, quote);
+            animatedMask = applyCustomLayout(context, widgetId, views, prefs, frameBackground,
+                    quote, sizeDp);
         } else {
-            animated = applyImage(context, widgetId, views, quote, background);
+            animated = applyImage(context, widgetId, views, quote, frameBackground);
         }
 
-        views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);
-        views.setTextColor(R.id.quote_meta, accent);
-        views.setInt(R.id.widget_root, "setBackgroundColor", background);
+        if (glassSpec != null) {
+            views.setTextColor(R.id.quote_text, GlassRenderer.textColor(glassSpec));
+            views.setTextColor(R.id.quote_meta, GlassRenderer.metaColor(glassSpec));
+            views.setTextColor(R.id.next_hint, GlassRenderer.hintColor(glassSpec));
+            views.setInt(R.id.widget_root, "setBackgroundColor", Color.TRANSPARENT);
+        } else {
+            views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);
+            views.setTextColor(R.id.quote_meta, accent);
+            views.setTextColor(R.id.next_hint, night ? 0x99FFFFFF : 0x776F80);
+            views.setInt(R.id.widget_root, "setBackgroundColor", background);
+        }
 
         Intent next = new Intent(ACTION).setPackage(context.getPackageName());
         PendingIntent click = PendingIntent.getBroadcast(
@@ -202,7 +240,8 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
      *
      * @return true 表示这次用的是逐帧轮播，调用方需要通知集合数据刷新
      */
-    private boolean applyImage(Context context, int widgetId, RemoteViews views, Quote quote, int background) {
+    private boolean applyImage(Context context, int widgetId, RemoteViews views, Quote quote,
+                               int frameBackground) {
         if (!quote.hasImage()) {
             views.setViewVisibility(R.id.quote_image, View.GONE);
             views.setViewVisibility(R.id.quote_image_flipper, View.GONE);
@@ -224,8 +263,8 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             adapter.setData(Uri.parse("frames://" + quote.imagePath));
             adapter.putStringArrayListExtra(QuoteImageWidgetService.EXTRA_FRAMES,
                     new ArrayList<>(frames));
-            // 逐帧图的透明区域要垫成小组件背景色，否则会透出下面的静态首帧
-            adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, background);
+            // 逐帧图的透明区域要垫成小组件底色，否则会透出下面的静态首帧
+            adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, frameBackground);
             views.setRemoteAdapter(widgetId, R.id.quote_image_flipper, adapter);
             // 翻页间隔固定在布局里（android:flipInterval），不用 setInt 反射调用，
             // 免得某些 launcher 因方法不可远程调用而丢弃整份 RemoteViews
@@ -250,12 +289,11 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
      *
      * @return 逐位标记哪些图片槽用了 GIF 轮播（调用方需要在 updateAppWidget 之后 notify）
      */
-    private int applyCustomLayout(Context context, AppWidgetManager manager, int widgetId,
-                                  RemoteViews views, SharedPreferences prefs, int background,
-                                  Quote quote) {
+    private int applyCustomLayout(Context context, int widgetId, RemoteViews views,
+                                  SharedPreferences prefs, int frameBackground, Quote quote,
+                                  int[] sizeDp) {
         CustomScene scene = CustomScene.load(prefs);
         float density = context.getResources().getDisplayMetrics().density;
-        int[] sizeDp = widgetSizeDp(manager, widgetId);
 
         int inset = Math.round(14 * density);
         int hostInset = Math.round(HOST_INSET_DP * density);
@@ -315,7 +353,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                         + box.rotation + "/" + box.flipH + "/" + box.flipV));
                 adapter.putStringArrayListExtra(QuoteImageWidgetService.EXTRA_FRAMES,
                         new ArrayList<>(frames));
-                adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, background);
+                adapter.putExtra(QuoteImageWidgetService.EXTRA_BACKGROUND, frameBackground);
                 adapter.putExtra(QuoteImageWidgetService.EXTRA_ROTATION, box.rotation);
                 adapter.putExtra(QuoteImageWidgetService.EXTRA_FLIP_H, box.flipH);
                 adapter.putExtra(QuoteImageWidgetService.EXTRA_FLIP_V, box.flipV);

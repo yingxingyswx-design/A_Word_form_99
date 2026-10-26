@@ -26,12 +26,18 @@ import java.util.Set;
 public class SettingsActivity extends AppCompatActivity {
 
     private static final int REQUEST_IMPORT_XML = 4401;
+    private static final int REQUEST_WALLPAPER = 4501;
     private static final String KEY_UPDATE_CHANNEL = "updateChannel";
 
 
     private SharedPreferences prefs;
     private boolean autoChecked;
     private UpdateChecker.Release latestRelease;
+
+    private final android.os.Handler refreshHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable refreshWidgets = () -> sendBroadcast(
+            new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -51,12 +57,146 @@ public class SettingsActivity extends AppCompatActivity {
         bindFontSize();
         bindMonet();
         bindThemeColor();
+        bindGlass();
+        bindWallpaperAccess();
         bindAddQuote();
         bindCustomLayout();
         bindImport();
         bindUpdate();
         bindRefreshAll();
         bindBottomNav();
+    }
+
+    /**
+     * 液态玻璃：开关 + 模糊 / 浓度 / 高光 / 圆角 + 色调。
+     * 拖动滑块时只更新预览，落稳 350ms 后再广播刷新桌面，避免每个 step 都重建位图。
+     */
+    private void bindGlass() {
+        final GlassPreviewView preview = findViewById(R.id.glass_preview);
+        MaterialSwitch enabled = findViewById(R.id.glass_enabled);
+        enabled.setChecked(GlassRenderer.enabled(prefs));
+        enabled.setOnCheckedChangeListener((button, checked) -> {
+            prefs.edit().putBoolean(GlassRenderer.KEY_ENABLED, checked).apply();
+            previewSpec();
+            scheduleWidgetRefresh();
+            Toast.makeText(this, checked
+                            ? "已开启液态玻璃，回桌面看效果"
+                            : "已关闭液态玻璃，恢复纯色底",
+                    Toast.LENGTH_SHORT).show();
+        });
+
+        bindGlassSlider(R.id.glass_blur, R.id.glass_blur_label, "雾面程度",
+                GlassRenderer.KEY_BLUR, GlassRenderer.DEFAULT_BLUR, "%");
+        bindGlassSlider(R.id.glass_density, R.id.glass_density_label, "玻璃浓度",
+                GlassRenderer.KEY_DENSITY, GlassRenderer.DEFAULT_DENSITY, "%");
+        bindGlassSlider(R.id.glass_highlight, R.id.glass_highlight_label, "高光 / 折射",
+                GlassRenderer.KEY_HIGHLIGHT, GlassRenderer.DEFAULT_HIGHLIGHT, "%");
+        bindGlassSlider(R.id.glass_corner, R.id.glass_corner_label, "圆角",
+                GlassRenderer.KEY_CORNER, GlassRenderer.DEFAULT_CORNER, "dp");
+
+        com.google.android.material.button.MaterialButtonToggleGroup tone =
+                findViewById(R.id.glass_tone_group);
+        String savedTone = prefs.getString(GlassRenderer.KEY_TONE, GlassRenderer.TONE_AUTO);
+        tone.check(GlassRenderer.TONE_DARK.equals(savedTone) ? R.id.glass_tone_dark
+                : GlassRenderer.TONE_LIGHT.equals(savedTone) ? R.id.glass_tone_light
+                : R.id.glass_tone_auto);
+        tone.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) return;
+            String value = checkedId == R.id.glass_tone_dark ? GlassRenderer.TONE_DARK
+                    : checkedId == R.id.glass_tone_light ? GlassRenderer.TONE_LIGHT
+                    : GlassRenderer.TONE_AUTO;
+            prefs.edit().putString(GlassRenderer.KEY_TONE, value).apply();
+            previewSpec();
+            scheduleWidgetRefresh();
+        });
+        previewSpec();
+    }
+
+    private void bindGlassSlider(int sliderId, int labelId, final String base,
+                                 final String key, int defaultValue, final String unit) {
+        final Slider slider = findViewById(sliderId);
+        final TextView label = findViewById(labelId);
+        int value = prefs.getInt(key, defaultValue);
+        value = Math.round(Math.max(slider.getValueFrom(), Math.min(slider.getValueTo(), value)));
+        slider.setValue(value);
+        label.setText(base + " · " + value + unit);
+        slider.addOnChangeListener((s, v, fromUser) -> {
+            int rounded = Math.round(v);
+            label.setText(base + " · " + rounded + unit);
+            prefs.edit().putInt(key, rounded).apply();
+            previewSpec();
+            scheduleWidgetRefresh();
+        });
+    }
+
+    private void previewSpec() {
+        GlassPreviewView preview = findViewById(R.id.glass_preview);
+        GlassRenderer.Spec spec = GlassRenderer.spec(this, prefs);
+        int[] colors = GlassRenderer.wallpaperColors(this);
+        spec.tint = colors[0];
+        spec.tint2 = colors[1];
+        spec.tint3 = colors[2];
+        preview.setSpec(spec, GlassRenderer.enabled(prefs));
+        preview.setWallpaper(WallpaperSource.load(this, 720));
+    }
+
+    /** 读真实壁纸需要「所有文件访问」（Android 11+）或存储权限（更早版本）。 */
+    private void bindWallpaperAccess() {
+        refreshWallpaperStatus();
+        findViewById(R.id.wallpaper_grant).setOnClickListener(v -> requestWallpaperAccess());
+    }
+
+    private void refreshWallpaperStatus() {
+        TextView status = findViewById(R.id.wallpaper_status);
+        if (WallpaperSource.canRead(this)) {
+            status.setText("真实壁纸：已授权，玻璃实时使用壁纸做模糊");
+        } else if (android.os.Build.VERSION.SDK_INT >= 30) {
+            status.setText("真实壁纸：未授权（需要「所有文件访问」）");
+        } else {
+            status.setText("真实壁纸：未授权（需要存储权限）");
+        }
+    }
+
+    private void requestWallpaperAccess() {
+        if (WallpaperSource.canRead(this)) {
+            Toast.makeText(this, "已授权，玻璃会实时使用壁纸", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            try {
+                startActivity(new Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        android.net.Uri.parse("package:" + getPackageName())));
+            } catch (Exception e) {
+                startActivity(new Intent(
+                        android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+            }
+        } else {
+            requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},
+                    REQUEST_WALLPAPER);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_WALLPAPER) return;
+        refreshWallpaperStatus();
+        previewSpec();
+        scheduleWidgetRefresh();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (prefs == null) return;
+        refreshWallpaperStatus();
+        previewSpec();
+    }
+
+    private void scheduleWidgetRefresh() {
+        refreshHandler.removeCallbacks(refreshWidgets);
+        refreshHandler.postDelayed(refreshWidgets, 350);
     }
 
     private void bindCustomLayout() {

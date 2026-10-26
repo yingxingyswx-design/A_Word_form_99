@@ -88,41 +88,6 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="桌面布局"
-                            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/custom_layout"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="自定义布局（拖动文字与图片）"
-                            android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/edit_layout"
-                            style="@style/Widget.Yiyan.Button.Tonal"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:text="调整文字 / 图片位置" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
-                    style="@style/Widget.Yiyan.Card"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
                             android:text="刷新顺序"
                             android:textAppearance="@style/TextAppearance.Yiyan.Section" />
 
@@ -288,16 +253,211 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="主题色"
+                    android:text="个性"
                     android:textAppearance="@style/TextAppearance.Yiyan.Display" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="跟随壁纸，或自己挑一个颜色"
+                    android:text="液态玻璃、桌面布局、字号与主题色"
                     android:textAppearance="?attr/textAppearanceBodyLarge"
                     android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Yiyan.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="液态玻璃"
+                            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/glass_enabled"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="小组件使用液态玻璃"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <com.example.yiyan.GlassPreviewView
+                            android:id="@+id/glass_preview"
+                            android:layout_width="match_parent"
+                            android:layout_height="132dp"
+                            android:layout_marginTop="12dp" />
+
+                        <TextView
+                            android:id="@+id/glass_blur_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:text="雾面程度"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/glass_blur"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:stepSize="1"
+                            android:valueFrom="0"
+                            android:valueTo="100" />
+
+                        <TextView
+                            android:id="@+id/glass_density_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="玻璃浓度"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/glass_density"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:stepSize="1"
+                            android:valueFrom="0"
+                            android:valueTo="100" />
+
+                        <TextView
+                            android:id="@+id/glass_highlight_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="高光 / 折射"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/glass_highlight"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:stepSize="1"
+                            android:valueFrom="0"
+                            android:valueTo="100" />
+
+                        <TextView
+                            android:id="@+id/glass_corner_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="圆角"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/glass_corner"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:stepSize="1"
+                            android:valueFrom="0"
+                            android:valueTo="48" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="色调"
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <com.google.android.material.button.MaterialButtonToggleGroup
+                            android:id="@+id/glass_tone_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            app:selectionRequired="true"
+                            app:singleSelection="true">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/glass_tone_auto"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="跟随系统" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/glass_tone_light"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="浅色" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/glass_tone_dark"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="深色" />
+                        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                        <TextView
+                            android:id="@+id/wallpaper_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:text="真实壁纸：未授权"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorPrimary" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/wallpaper_grant"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="允许读取壁纸（所有文件访问）" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="小组件本身是透明的：桌面壁纸就是玻璃的背景，实时对齐、不需要权限。Android 小组件不能对桌面做真模糊，所以「雾面程度」只是给玻璃加一层极淡的漫射。下面这项权限只影响 App 内预览能不能垫上真实壁纸。"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Yiyan.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="桌面布局"
+                            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/custom_layout"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="自定义布局（拖动文字与图片）"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/edit_layout"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="调整文字 / 图片位置" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
                     style="@style/Widget.Yiyan.Card"
