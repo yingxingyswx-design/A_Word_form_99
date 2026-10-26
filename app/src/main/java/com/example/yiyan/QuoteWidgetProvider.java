@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * 桌面小组件。每次刷新从 SharedPreferences 重新组装候选集、挑一条、渲染 RemoteViews。
@@ -382,6 +383,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
      */
     private List<Quote> candidates(Context context, SharedPreferences prefs) {
         List<Quote> list = new ArrayList<>();
+        Set<String> disabled = prefs.getStringSet("disabledCategories", new HashSet<String>());
 
         String saved = prefs.getString("editable_library", "");
         if (!saved.trim().isEmpty()) {
@@ -400,11 +402,26 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             if (quote != null) list.add(quote);
         }
 
-        // 内置 Hitokoto 语料（分类「随机」），可在设置里关掉
+        // 内置 Hitokoto 语料（12 个原始分类），可在设置里整体关掉
         if (prefs.getBoolean("showHitokoto", true)) {
             list.addAll(HitokotoLibrary.quotes(context));
         }
-        return list;
+
+        List<Quote> filtered = list;
+        if (!disabled.isEmpty()) {
+            filtered = new ArrayList<>(list.size());
+            for (Quote quote : list) {
+                if (!disabled.contains(quote.category)) filtered.add(quote);
+            }
+            Log.i(TAG, "候选 " + list.size() + " 条，禁用 " + disabled.size()
+                    + " 个分类后剩 " + filtered.size() + " 条");
+            // 全被禁掉时不做静默失败：退回完整列表，避免桌面卡在旧的一句
+            if (filtered.isEmpty()) {
+                Log.w(TAG, "所有分类都被禁用，本次忽略过滤");
+                return list;
+            }
+        }
+        return filtered;
     }
 
     /** 元信息行：作者与出处在缺失时整段省略，不会出现 “—  · 《》”。 */

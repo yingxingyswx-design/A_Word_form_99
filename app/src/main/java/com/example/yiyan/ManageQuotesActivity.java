@@ -114,6 +114,12 @@ public class ManageQuotesActivity extends AppCompatActivity {
         flow.addView(categoryFilter);
         refreshCategoryFilter();
 
+        com.google.android.material.button.MaterialButton visibility =
+                new com.google.android.material.button.MaterialButton(this);
+        visibility.setText("分类显示设置（哪些分类上桌面）");
+        visibility.setOnClickListener(v -> showCategoryVisibilityDialog());
+        flow.addView(visibility);
+
         add.setOnClickListener(v -> {
             String name = input.getText().toString().trim();
             if (!name.isEmpty() && !categories.contains(name)) {
@@ -158,6 +164,38 @@ public class ManageQuotesActivity extends AppCompatActivity {
 
     private void saveCategories() {
         prefs.edit().putStringSet("categories", new HashSet<>(categories)).apply();
+    }
+
+    /** 分类显示设置：勾选哪些分类会出现在桌面小组件里（取消勾选 = 禁用）。 */
+    private void showCategoryVisibilityDialog() {
+        final java.util.List<String> options = new ArrayList<>();
+        for (String category : categories) {
+            if (!ALL.equals(category)) options.add(category);
+        }
+        if (options.isEmpty()) return;
+
+        final String[] labels = options.toArray(new String[0]);
+        final java.util.Set<String> disabled = new java.util.HashSet<>(
+                prefs.getStringSet("disabledCategories", new HashSet<String>()));
+        final boolean[] checked = new boolean[labels.length];
+        for (int i = 0; i < labels.length; i++) checked[i] = !disabled.contains(labels[i]);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("桌面显示的分类")
+                .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> {
+                    if (isChecked) disabled.remove(labels[which]);
+                    else disabled.add(labels[which]);
+                })
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", (dialog, which) -> {
+                    prefs.edit().putStringSet("disabledCategories", disabled).apply();
+                    sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
+                    Toast.makeText(this, disabled.isEmpty()
+                            ? "所有分类都会显示在桌面"
+                            : "已隐藏 " + disabled.size() + " 个分类", Toast.LENGTH_SHORT).show();
+                    render("");
+                })
+                .show();
     }
 
     private void refreshCategoryFilter() {
@@ -233,7 +271,7 @@ public class ManageQuotesActivity extends AppCompatActivity {
     // ---- 列表 ----
 
     private void render(String query) {
-        while (flow.getChildCount() > 3) flow.removeViewAt(3);
+        while (flow.getChildCount() > 4) flow.removeViewAt(4);
 
         String keyword = query.trim().toLowerCase(Locale.ROOT);
         String selected = categoryFilter == null ? ALL : String.valueOf(categoryFilter.getSelectedItem());
