@@ -80,8 +80,27 @@ public class SettingsActivity extends AppCompatActivity {
             previewSpec();
             scheduleWidgetRefresh();
             Toast.makeText(this, checked
-                            ? "已开启液态玻璃，回桌面看效果"
-                            : "已关闭液态玻璃，恢复纯色底",
+                            ? "已开启玻璃材质，回桌面看效果"
+                            : "已关闭玻璃材质，恢复纯色底",
+                    Toast.LENGTH_SHORT).show();
+        });
+
+        com.google.android.material.button.MaterialButtonToggleGroup material =
+                findViewById(R.id.glass_material_group);
+        String savedMaterial = prefs.getString(GlassRenderer.KEY_MATERIAL,
+                GlassRenderer.MATERIAL_FROST);
+        material.check(GlassRenderer.MATERIAL_LIQUID.equals(savedMaterial)
+                ? R.id.glass_material_liquid : R.id.glass_material_frost);
+        material.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) return;
+            String value = checkedId == R.id.glass_material_liquid
+                    ? GlassRenderer.MATERIAL_LIQUID : GlassRenderer.MATERIAL_FROST;
+            prefs.edit().putString(GlassRenderer.KEY_MATERIAL, value).apply();
+            previewSpec();
+            scheduleWidgetRefresh();
+            Toast.makeText(this, GlassRenderer.MATERIAL_LIQUID.equals(value)
+                            ? "已切换：液态玻璃（透明，桌面壁纸实时透出）"
+                            : "已切换：毛玻璃（真实壁纸模糊）",
                     Toast.LENGTH_SHORT).show();
         });
 

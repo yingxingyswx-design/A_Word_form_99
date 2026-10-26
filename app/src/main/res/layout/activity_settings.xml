@@ -278,7 +278,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="液态玻璃"
+                            android:text="玻璃材质"
                             android:textAppearance="@style/TextAppearance.Yiyan.Section" />
 
                         <com.google.android.material.materialswitch.MaterialSwitch
@@ -286,8 +286,33 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="小组件使用液态玻璃"
+                            android:text="小组件使用玻璃材质"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <com.google.android.material.button.MaterialButtonToggleGroup
+                            android:id="@+id/glass_material_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            app:selectionRequired="true"
+                            app:singleSelection="true">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/glass_material_frost"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="毛玻璃" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/glass_material_liquid"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="液态玻璃" />
+                        </com.google.android.material.button.MaterialButtonToggleGroup>
 
                         <com.example.yiyan.GlassPreviewView
                             android:id="@+id/glass_preview"

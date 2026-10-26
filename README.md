@@ -16,23 +16,25 @@
 - GIF 会预拆成逐帧 PNG（间隔固定 200 ms、最多 12 帧、单帧最长边 160 px，拆帧时会跳过连续重复帧），小组件用 `AdapterViewFlipper` + `RemoteViewsService` 在桌面本地翻页，不需要应用进程反复刷新；首帧同时铺在静态 `ImageView` 上，遇到不支持集合控件的桌面也还能显示。管理页编辑时可看原始动画。
 - 自定义布局（开关 + 编辑器）：文字框与最多 4 个图片框都可拖动，拖右下角可改大小；图片支持删除、旋转 90°、水平/垂直镜像；小组件尺寸可在编辑器里用「宽 +/− / 高 +/−」调整，画布按同样宽高比预览。文字与图片都是实体，框体相交时这次位移会被丢弃。坐标以 0–1 分数保存，小组件按实际尺寸用 padding 还原；可开启「文字以框形式」（圆角描边）。桌面端收不到拖拽事件，所以拖拽只发生在应用内画布上。
 - 配图经系统文件选择器（SAF）选取后立刻复制到应用私有目录 `files/quote_images/`，不占相册授权、也不依赖可撤销的 `content://` 权限；单张上限 16 MB。
-- 液态玻璃主题（「个性」Tab）：`GlassRenderer` 渲染的是 Apple `.clear` 那种「透明玻璃」——面板本身几乎全透明，桌面壁纸就是它的背景（因此天然对齐、实时变化，也不需要任何权限），质感全部由边缘光学承担：连续曲率圆角、透镜亮边、内侧折痕、定向镜面高光、顶边内阴影。「雾面程度 / 玻璃浓度 / 高光 / 圆角 / 浅深色调」都能在页面里实时预览，预览底图是 App 读到的真实壁纸（可选「所有文件访问」）。
-- 「个性」Tab = 液态玻璃 + 桌面布局 + 字号 + 主题色；「设置」Tab 仍是 XML 导入、GitHub Release 更新检查与下载安装、说明书。更新检查优先走 `api.github.com`，被 DNS 拦掉时退回 `github.com/…/releases.atom`。
+- 玻璃材质（「个性」Tab，可切换）：
+  - **毛玻璃**（默认）：真实壁纸 → 中心裁剪 → 缩样 → 盒式模糊；再逐像素走透镜管线（SDF 求边缘与法线 → 沿法线向内采样做折射 → 边缘 RGB 色散 → 提饱和 → 只提暗部的自适应薄雾 → rim line / 定向高光 / 背光侧内阴影），SDF 覆盖率当 alpha。灯下看起来是一块透镜，而不是一层糊。
+  - **液态玻璃**：Apple `.clear` 那种几乎全透明的玻璃，桌面壁纸直接透出（天然对齐、无需权限），质感由 squircle 圆角、透镜亮边、内侧折痕、镜面高光承担。
+  - 「雾面程度 / 玻璃浓度 / 高光 / 圆角 / 浅深色调」都能在页面里实时预览，预览底图是 App 读到的真实壁纸（可选「所有文件访问」）。
+- 「个性」Tab = 玻璃材质 + 桌面布局 + 字号 + 主题色；「设置」Tab 仍是 XML 导入、GitHub Release 更新检查与下载安装、说明书。更新检查优先走 `api.github.com`，被 DNS 拦掉时退回 `github.com/…/releases.atom`。
 - XML 导入格式：根节点随意，条目用 `<quote>` 或 `<item>`，属性 `text/author/work/category` 或同名子标签均可，只有 `text` 必填，重复条目跳过。
 - Android 6.0+（minSdk 23），Java 实现。
 
-## 液态玻璃：能做到什么，做不到什么
+## 玻璃是怎么算出来的
 
-按 Apple HIG / WWDC25《Meet Liquid Glass》的硬特征实现：连续曲率（squircle）圆角、边缘透镜（亮边 → 薄暗折痕 → 内侧回光）、迎光侧的局部镜面高光、随内容轻微变化的光源方向。
+参考社区里把 iOS 26 Liquid Glass 在 Android 上复刻出来的实现（[react-native-liquid-glassmorphism](https://github.com/himanshu-lal4/react-native-liquid-glassmorphism)、[作者拆解](https://github.com/himanshu-lal4/react-native-liquid-glassmorphism/blob/218a47281e1f01e91a024fef83d62f48c3f5f9fc/growth/blog-android-agsl-deep-dive.md)）：它不是模糊面板，而是一块**透镜**——用圆角矩形的 SDF 取到边距离与法线，在边缘把采样坐标沿法线向内推，背景因此被「折」进来；再叠色散、vibrancy、自适应薄雾、干净的 rim line 与定向高光。那边用 `RuntimeShader`（AGSL，API 33+）在 GPU 上跑，这里因为结果要塞进 `RemoteViews`，用同一套数学在 CPU 上逐像素算成位图（工作分辨率上限 860px，单次渲染几十毫秒，在后台线程做）。
 
-| 问题 | 现实 | 这里的做法 |
+| 限制 | 现实 | 这里的取舍 |
 | --- | --- | --- |
-| 小组件能不能模糊身后的桌面 | 不能。`RemoteViews` 没有 backdrop blur，launcher 也不会把身后的像素交给小组件 | 玻璃做成透明的，真壁纸直接透出来（= Apple `.clear`）；模糊在小组件层无法实现 |
-| 自己取壁纸再模糊、贴进小组件行不行 | 试过，看起来像贴纸：小组件不知道自己摆在壁纸的哪一格，模糊块和真实壁纸在边界对不上，色差一眼可见 | 已放弃，改为透明玻璃 |
-| 读壁纸需要什么 | Android 14 起 `WallpaperManager` 需要 `MANAGE_EXTERNAL_STORAGE`，否则抛 `SecurityException` | 只用于「个性」页的实时预览垫底；不授权就用壁纸取色的渐变垫底 |
-| App 内能不能做真模糊 | 能：`RenderEffect`（API 31+）/ `Window.setBackgroundBlurRadius` 只对应用自己的窗口生效 | 预览里直接用真实壁纸，玻璃透明叠在上面，所见即桌面 |
+| 小组件能不能对桌面做实时 backdrop blur | 不能。`RemoteViews` 没有 RenderEffect / RuntimeShader，launcher 也不会把身后的像素交出来 | 毛玻璃用 `MANAGE_EXTERNAL_STORAGE` 读到壁纸后自己算；液态玻璃则让壁纸直接透出 |
+| 毛玻璃的壁纸和桌面上的壁纸对不齐 | 小组件无法知道自己摆在壁纸哪一格 | 按中心裁剪；透镜 + 模糊会掩盖大部分差异，但放大看边界仍可能有色差 |
+| App 内能不能做真模糊 | 能：`RenderEffect`（API 31+）只作用于应用自己的窗口 | 预览直接用真实壁纸垫底，玻璃透明/半透明叠上去，所见即桌面 |
 
-隐私：`MANAGE_EXTERNAL_STORAGE` 只被 `WallpaperSource` 用来读壁纸，不遍历任何文件；不授权不影响其他功能。
+隐私：`MANAGE_EXTERNAL_STORAGE` 只被 `WallpaperSource` 用来读壁纸，不遍历任何文件；不授权时毛玻璃退回壁纸取色。
 
 
 ## 构建

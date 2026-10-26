@@ -176,13 +176,16 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             glassSpec.tint2 = wallpaperColors[1];
             glassSpec.tint3 = wallpaperColors[2];
             glassSpec.light = (Math.abs(quote.text.hashCode()) % 1000) / 1000f;
-            Log.i(TAG, "液态玻璃 " + sizeDp[0] + "x" + sizeDp[1] + "dp tone="
+            Log.i(TAG, "玻璃材质=" + glassSpec.material + " " + sizeDp[0] + "x" + sizeDp[1] + "dp tone="
                     + (glassSpec.dark ? "dark" : "light")
                     + " blur=" + Math.round(glassSpec.blur * 100)
                     + " density=" + Math.round(glassSpec.density * 100));
+            // 毛玻璃需要真实壁纸做模糊底；拿不到时 renderer 会用壁纸取色兜底
+            Bitmap wallpaper = glassSpec.isFrost()
+                    ? WallpaperSource.load(context, 720) : null;
             Bitmap glassBitmap = GlassRenderer.render(context,
                     Math.round(sizeDp[0] * density), Math.round(sizeDp[1] * density),
-                    glassSpec, null);
+                    glassSpec, wallpaper);
             views.setImageViewBitmap(R.id.glass_bg, glassBitmap);
             views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
             frameBackground = GlassRenderer.solidFill(glassSpec);
