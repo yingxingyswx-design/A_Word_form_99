@@ -1,1 +1,59 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="top" android:padding="14dp" android:background="@drawable/widget_background"><TextView android:id="@+id/quote_text" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:text="知者不惑。" android:textColor="@color/ink" android:textSize="16sp" android:gravity="top" android:maxLines="8" android:ellipsize="end"/><TextView android:id="@+id/quote_meta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="— 孔子 · 《论语》 · 原文" android:textColor="@color/accent" android:textSize="11sp" android:maxLines="3" android:ellipsize="end"/><TextView android:id="@+id/next_hint" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="点按换一句" android:textColor="#776F80" android:textSize="9sp" android:gravity="right"/></LinearLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:baselineAligned="false"
+    android:gravity="top"
+    android:padding="14dp"
+    android:background="@drawable/widget_background">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/quote_text"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:text="知者不惑。"
+            android:textColor="@color/ink"
+            android:textSize="16sp"
+            android:gravity="top"
+            android:maxLines="8"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/quote_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="— 孔子 · 《论语》 · 原文"
+            android:textColor="@color/accent"
+            android:textSize="11sp"
+            android:maxLines="3"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/next_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="点按换一句"
+            android:textColor="#776F80"
+            android:textSize="9sp"
+            android:gravity="right" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/quote_image"
+        android:layout_width="78dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="10dp"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+</LinearLayout>

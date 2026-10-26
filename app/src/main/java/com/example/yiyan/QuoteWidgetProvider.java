@@ -8,8 +8,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import java.util.ArrayList;
@@ -72,6 +74,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.quote_meta, meta(quote));
         views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
                 prefs.getInt("fontSize", 16));
+        applyImage(context, views, quote);
 
         boolean night = (context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
@@ -92,6 +95,22 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
 
         manager.updateAppWidget(widgetId, views);
+    }
+
+    /**
+     * 配图渲染在右侧。RemoteViews 不支持动图，GIF 只能取首帧；
+     * 位图必须压到 {@link ImageStore#WIDGET_MAX_PX}，否则单次 RemoteViews 会超过 Binder 限制。
+     */
+    private void applyImage(Context context, RemoteViews views, Quote quote) {
+        Bitmap bitmap = quote.hasImage()
+                ? ImageStore.decode(context, quote.imagePath, ImageStore.WIDGET_MAX_PX)
+                : null;
+        if (bitmap == null) {
+            views.setViewVisibility(R.id.quote_image, View.GONE);
+            return;
+        }
+        views.setViewVisibility(R.id.quote_image, View.VISIBLE);
+        views.setImageViewBitmap(R.id.quote_image, bitmap);
     }
 
     /**

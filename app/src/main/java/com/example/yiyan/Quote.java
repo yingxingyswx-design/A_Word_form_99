@@ -1,28 +1,34 @@
 package com.example.yiyan;
 
 /**
- * 一条一言。作者与出处可以为空（用户只写句子也是合法条目），只有 {@link #text} 是必填。
- * 存储格式统一为 {@code 句子|作者|出处|分类}，见 {@link #toLine()} / {@link #parse(String, String, String)}。
+ * 一条一言。作者、出处、配图都可以为空（只写句子也是合法条目），只有 {@link #text} 必填。
+ * 存储格式统一为 {@code 句子|作者|出处|分类|图片文件名}，见 {@link #toLine()} / {@link #parse(String, String, String)}。
+ * 图片只存文件名，实际文件在应用私有目录 {@code files/quote_images/} 下，由 {@link ImageStore} 管理。
  */
 public class Quote {
 
-    public final String text, author, work, kind, category;
+    public final String text, author, work, kind, category, imagePath;
 
     public Quote(String text, String author, String work, String kind) {
-        this(text, author, work, kind, "哲学");
+        this(text, author, work, kind, "哲学", "");
     }
 
     public Quote(String text, String author, String work, String kind, String category) {
+        this(text, author, work, kind, category, "");
+    }
+
+    public Quote(String text, String author, String work, String kind, String category, String imagePath) {
         this.text = text == null ? "" : text;
         this.author = author == null ? "" : author;
         this.work = work == null ? "" : work;
         this.kind = kind == null ? "" : kind;
         this.category = category == null || category.trim().isEmpty() ? "用户" : category;
+        this.imagePath = imagePath == null ? "" : imagePath;
     }
 
     /**
-     * 解析一行存储数据。作者、出处、分类都可缺省，只有句子必须非空。
-     * 兼容 3 段（句子|作者|出处）与 4 段两种历史格式。
+     * 解析一行存储数据。作者、出处、分类、配图都可缺省，只有句子必须非空。
+     * 兼容 3 段（句子|作者|出处）、4 段、5 段三种历史格式。
      *
      * @return 解析失败（句子为空）时返回 null
      */
@@ -35,12 +41,14 @@ public class Quote {
         String workPart = fields.length > 2 ? fields[2].trim() : "";
         String categoryPart = fields.length > 3 && !fields[3].trim().isEmpty()
                 ? fields[3].trim() : defaultCategory;
-        return new Quote(textPart, authorPart, workPart, kind, categoryPart);
+        String imagePart = fields.length > 4 ? fields[4].trim() : "";
+        return new Quote(textPart, authorPart, workPart, kind, categoryPart, imagePart);
     }
 
-    /** 序列化成存储行，字段缺失时留空，例如 {@code 人生如逆旅|||感悟}。 */
+    /** 序列化成存储行；空字段留空，例如 {@code 人生如逆旅|||感悟} 或 {@code 句子|作者|出处|分类|abc.gif}。 */
     public String toLine() {
-        return text + "|" + author + "|" + work + "|" + category;
+        String base = text + "|" + author + "|" + work + "|" + category;
+        return imagePath.isEmpty() ? base : base + "|" + imagePath;
     }
 
     /** 展示用的出处部分：{@code — 作者 · 《作品》}；两者都没有时返回空串而不是 "— 《》"。 */
@@ -58,5 +66,9 @@ public class Quote {
 
     public boolean hasSource() {
         return !author.trim().isEmpty() || !work.trim().isEmpty();
+    }
+
+    public boolean hasImage() {
+        return !imagePath.trim().isEmpty();
     }
 }
