@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/></intent></queries>
     <application android:name=".DailyApp" android:theme="@style/AppTheme" android:label="@string/app_name" android:icon="@mipmap/ic_launcher_v2" android:roundIcon="@mipmap/ic_launcher_round_v2" android:resizeableActivity="true">
@@ -10,6 +11,7 @@
         <activity android:name=".SettingsActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
         <receiver android:name=".QuoteWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/><action android:name="com.example.yiyan.NEXT_QUOTE"/><action android:name="android.intent.action.USER_PRESENT"/><action android:name="android.intent.action.SCREEN_ON"/><action android:name="android.intent.action.CLOSE_SYSTEM_DIALOGS"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/quote_widget_info"/></receiver>
         <service android:name=".QuoteImageWidgetService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS"/>
+        <receiver android:name=".BootReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.QUICKBOOT_POWERON"/></intent-filter></receiver>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

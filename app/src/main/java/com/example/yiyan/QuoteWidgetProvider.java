@@ -178,6 +178,9 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             Bitmap glassBitmap = GlassRenderer.render(context,
                     Math.round(sizeDp[0] * density), Math.round(sizeDp[1] * density),
                     glassSpec);
+            Log.i(TAG, "glass bitmap " + glassBitmap.getWidth() + "x" + glassBitmap.getHeight()
+                    + " centerAlpha=" + android.graphics.Color.alpha(glassBitmap.getPixel(
+                    glassBitmap.getWidth() / 2, glassBitmap.getHeight() / 2)));
             views.setImageViewBitmap(R.id.glass_bg, glassBitmap);
             views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
             frameBackground = GlassRenderer.solidFill(glassSpec);

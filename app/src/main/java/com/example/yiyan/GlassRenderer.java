@@ -149,7 +149,7 @@ public final class GlassRenderer {
         if (spec.isFrost()) {
             alpha = (spec.dark ? 0.30f : 0.36f) + spec.density * 0.28f + spec.blur * 0.10f;
         } else {
-            alpha = (spec.dark ? 0.10f : 0.12f) + spec.density * 0.16f;
+            alpha = (spec.dark ? 0.18f : 0.16f) + spec.density * 0.26f;
         }
         int color = spec.dark ? 0xFF101018 : 0xFFFFFFFF;
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -162,13 +162,13 @@ public final class GlassRenderer {
         float high;
         float low;
         if (spec.dark) {
-            high = 0.05f + 0.10f * spec.highlight;
-            low = 0.01f + 0.04f * spec.highlight;
+            high = 0.08f + 0.14f * spec.highlight;
+            low = 0.03f + 0.06f * spec.highlight;
         } else {
-            high = 0.08f + 0.18f * spec.highlight;
-            low = 0.03f + 0.08f * spec.highlight;
+            high = 0.12f + 0.22f * spec.highlight;
+            low = 0.05f + 0.10f * spec.highlight;
         }
-        float base = 0.45f + (1f - spec.density) * 0.35f;
+        float base = 0.55f + (1f - spec.density) * 0.35f;
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setShader(new LinearGradient(0, 0, 0, h,
                 withAlpha(0xFFFFFFFF, high * base),
@@ -180,10 +180,10 @@ public final class GlassRenderer {
     private static void drawSpecular(Canvas canvas, int w, int h, Spec spec, float density) {
         if (spec.highlight <= 0.02f) return;
         float alpha = spec.dark
-                ? 0.10f + 0.12f * spec.highlight
-                : 0.25f + 0.25f * spec.highlight;
+                ? 0.18f + 0.16f * spec.highlight
+                : 0.38f + 0.32f * spec.highlight;
         float top = 2f * density;
-        float thickness = Math.max(1.2f, 1.5f * density);
+        float thickness = Math.max(1.4f, 2f * density);
         float left = w * 0.15f;
         float right = w * 0.85f;
 
@@ -198,8 +198,8 @@ public final class GlassRenderer {
     /** 底部内发光：给玻璃一点厚度。 */
     private static void drawInnerGlow(Canvas canvas, int w, int h, Spec spec, float density) {
         float alpha = spec.dark
-                ? 0.02f + 0.04f * spec.highlight
-                : 0.04f + 0.08f * spec.highlight;
+                ? 0.04f + 0.06f * spec.highlight
+                : 0.08f + 0.12f * spec.highlight;
         float inset = 4f * density;
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setShader(new LinearGradient(0, h - 4f * density, 0, h - 8f * density,
@@ -232,10 +232,10 @@ public final class GlassRenderer {
 
     /** 1px 边框：迎光侧更亮，背光侧几乎消失。 */
     private static void drawBorder(Canvas canvas, Path shape, int w, int h, Spec spec, float density) {
-        float alpha = spec.dark ? 0.08f : 0.25f;
+        float alpha = spec.dark ? 0.16f : 0.42f;
         Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
         border.setStyle(Paint.Style.STROKE);
-        border.setStrokeWidth(Math.max(1f, density));
+        border.setStrokeWidth(Math.max(1.1f, 1.2f * density));
         border.setShader(new LinearGradient(0, 0, w, h,
                 new int[]{withAlpha(0xFFFFFFFF, alpha * spec.highlight * 1.6f),
                         withAlpha(0xFFFFFFFF, alpha * 0.35f),

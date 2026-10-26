@@ -57,6 +57,7 @@ public class SettingsActivity extends AppCompatActivity {
         bindMonet();
         bindThemeColor();
         bindGlass();
+        bindRootHomeWatch();
         bindAddQuote();
         bindCustomLayout();
         bindImport();
@@ -150,6 +151,92 @@ public class SettingsActivity extends AppCompatActivity {
         GlassPreviewView preview = findViewById(R.id.glass_preview);
         GlassRenderer.Spec spec = GlassRenderer.spec(this, prefs);
         preview.setSpec(spec, GlassRenderer.enabled(prefs));
+    }
+
+    /** 回桌面自动换一句：root 常驻脚本监听焦点窗口，见 {@link RootHomeWatcher}。 */
+    private void bindRootHomeWatch() {
+        final MaterialSwitch watch = findViewById(R.id.root_home_watch);
+        final TextView status = findViewById(R.id.root_status);
+        watch.setChecked(RootHomeWatcher.isEnabled(this));
+        refreshRootStatus(status);
+
+        watch.setOnCheckedChangeListener((button, checked) -> {
+            if (checked) {
+                button.setEnabled(false);
+                new Thread(() -> {
+                    boolean root = RootHomeWatcher.hasRoot();
+                    boolean shizuku = RootHomeWatcher.hasShizuku();
+                    if (!root && shizuku && !RootHomeWatcher.shizukuGranted()) {
+                        runOnUiThread(() -> {
+                            button.setEnabled(true);
+                            RootHomeWatcher.requestShizukuPermission();
+                            Toast.makeText(this, "请在 Shizuku 里允许「每日一言」",
+                                    Toast.LENGTH_LONG).show();
+                        });
+                        return;
+                    }
+                    if (!root && !shizuku) {
+                        runOnUiThread(() -> {
+                            button.setEnabled(true);
+                            button.setChecked(false);
+                            refreshRootStatus(status);
+                            Toast.makeText(this, "没有 root，也没检测到运行中的 Shizuku",
+                                    Toast.LENGTH_LONG).show();
+                        });
+                        return;
+                    }
+                    final boolean ok = RootHomeWatcher.start(this);
+                    prefs.edit().putBoolean(RootHomeWatcher.KEY_ENABLED, ok).apply();
+                    runOnUiThread(() -> {
+                        button.setEnabled(true);
+                        button.setChecked(ok);
+                        refreshRootStatus(status);
+                        Toast.makeText(this, ok ? "已开启：回到桌面自动换一句"
+                                        : "脚本没能启动，换个后端再试",
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }).start();
+            } else {
+                new Thread(() -> {
+                    RootHomeWatcher.stop(this);
+                    runOnUiThread(() -> refreshRootStatus(status));
+                }).start();
+                prefs.edit().putBoolean(RootHomeWatcher.KEY_ENABLED, false).apply();
+            }
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != RootHomeWatcher.REQUEST_SHIZUKU) return;
+        if (grantResults.length == 0 || grantResults[0] != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Shizuku 未授权", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new Thread(() -> {
+            final boolean ok = RootHomeWatcher.start(this);
+            prefs.edit().putBoolean(RootHomeWatcher.KEY_ENABLED, ok).apply();
+            runOnUiThread(() -> {
+                MaterialSwitch watch = findViewById(R.id.root_home_watch);
+                watch.setChecked(ok);
+                refreshRootStatus(findViewById(R.id.root_status));
+                Toast.makeText(this, ok ? "已通过 Shizuku 开启" : "Shizuku 脚本启动失败",
+                        Toast.LENGTH_SHORT).show();
+            });
+        }).start();
+    }
+
+    private void refreshRootStatus(TextView status) {
+        new Thread(() -> {
+            final boolean running = RootHomeWatcher.isRunning(this);
+            final String backend = RootHomeWatcher.backend(this);
+            final String label = RootHomeWatcher.BACKEND_SHIZUKU.equals(backend)
+                    ? "Shizuku" : "root";
+            runOnUiThread(() -> status.setText(running
+                    ? "状态：运行中（" + label + "）· 正在监听回到桌面"
+                    : "状态：未运行"));
+        }).start();
     }
 
     private void scheduleWidgetRefresh() {

@@ -711,6 +711,50 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:text="回桌面自动换一句"
+                            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/root_home_watch"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="每次回到桌面换一句（Root / Shizuku）"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <TextView
+                            android:id="@+id/root_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text=""
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Android 没有「进入桌面」的广播，所以用 shell 权限常驻一个每秒一次的轻量脚本监听焦点窗口，切回桌面时发一次换句广播。优先用 root；没有 root 时用 Shizuku（需在 Shizuku 里允许本应用）。不占应用进程、不弹通知，开机后自动恢复。"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Yiyan.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
                             android:text="关于"
                             android:textAppearance="@style/TextAppearance.Yiyan.Section" />
 
