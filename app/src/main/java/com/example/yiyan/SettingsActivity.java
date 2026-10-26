@@ -120,22 +120,40 @@ public class SettingsActivity extends Activity {
             EditText workField = findViewById(R.id.custom_work);
             Spinner category = findViewById(R.id.custom_category);
 
-            String text = textField.getText().toString().trim();
-            String author = authorField.getText().toString().trim();
-            String work = workField.getText().toString().trim();
-            String cat = String.valueOf(category.getSelectedItem());
-            if (text.isEmpty() || author.isEmpty() || work.isEmpty()) {
-                Toast.makeText(this, "请填写句子、作者和出处", Toast.LENGTH_SHORT).show();
+            String text = sanitize(textField.getText().toString());
+            if (text.isEmpty()) {
+                Toast.makeText(this, "句子是必填的", Toast.LENGTH_SHORT).show();
+                textField.requestFocus();
                 return;
             }
+            // 作者与出处都是选填，留空时条目照样有效，小组件那一行会整段省略
+            String author = sanitize(authorField.getText().toString());
+            String work = sanitize(workField.getText().toString());
+            String cat = String.valueOf(category.getSelectedItem());
+
             Set<String> quotes = new HashSet<>(prefs.getStringSet("custom_quotes", new HashSet<String>()));
-            quotes.add(text + "|" + author + "|" + work + "|" + cat);
+            String line = new Quote(text, author, work, "用户添加", cat).toLine();
+            if (!quotes.add(line)) {
+                Toast.makeText(this, "这条一言已经在库里了", Toast.LENGTH_SHORT).show();
+                return;
+            }
             prefs.edit().putStringSet("custom_quotes", quotes).apply();
+
             textField.setText("");
             authorField.setText("");
             workField.setText("");
-            Toast.makeText(this, "已加入“" + cat + "”分类", Toast.LENGTH_SHORT).show();
+            sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
+            Toast.makeText(this,
+                    author.isEmpty() && work.isEmpty()
+                            ? "已添加（未填写作者与出处）"
+                            : "已加入“" + cat + "”分类",
+                    Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /** 存储用 "|" 分字段、换行分条目，所以用户输入里的这两个字符要替换掉。 */
+    private String sanitize(String raw) {
+        return raw.replace('|', '／').replace('\n', ' ').replace('\r', ' ').trim();
     }
 
     private void bindRefreshAll() {
