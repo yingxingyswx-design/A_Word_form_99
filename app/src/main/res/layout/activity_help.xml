@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="说明书"
+                android:textAppearance="@style/TextAppearance.Yiyan.Display" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="从添加小组件到导入语料，一页看完"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Yiyan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="1 · 把小组件放到桌面"
+                        android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="在「一言」页点「将小组件添加到桌面」。\n\n· Android 8+：系统会弹确认框，点添加即可。\n· HyperOS / MIUI：不弹框，但需要「桌面快捷方式」权限，缺权限会静默失败，按提示去开启。\n· OriginOS / iQOO：系统不允许应用直接添加，长按桌面空白处 →「原子组件」→「安卓组件」里拖到桌面。"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Yiyan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="2 · 换句子与配图"
+                        android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="点小组件换一句；「刷新顺序」可切随机 / 顺序。\n\n「一言管理」里点任意条目即可编辑句子、作者、出处、分类，并选配图（支持 GIF，桌面会逐帧播放）。作者与出处都是选填。"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Yiyan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="3 · 自定义布局"
+                        android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="打开「自定义布局」后点「调整文字 / 图片位置」：\n\n· 拖动框体移动，拖右下角改大小\n· 文字框与图片框是实体，相交时这次位移会被放弃\n· 可加最多 4 张图，支持删除、旋转 90°、水平 / 垂直镜像\n· 「宽 +/− / 高 +/−」调整小组件尺寸，画布按同比例预览"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Yiyan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="4 · 导入 XML 语料"
+                        android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="在「设置」页点「选择 XML 文件」。根节点名字随意，条目用 &lt;quote&gt;（或 &lt;item&gt;），只有 text 必填，重复条目会自动跳过。"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/code_block_bg"
+                        android:fontFamily="monospace"
+                        android:padding="12dp"
+                        android:text="&lt;quotes&gt;\n  &lt;quote text=&quot;人生如逆旅，我亦是行人。&quot;\n         author=&quot;苏轼&quot; work=&quot;临江仙&quot;\n         category=&quot;诗词&quot;/&gt;\n\n  &lt;quote&gt;\n    &lt;text&gt;慢慢来，比较快。&lt;/text&gt;\n    &lt;author&gt;佚名&lt;/author&gt;\n    &lt;category&gt;随想&lt;/category&gt;\n  &lt;/quote&gt;\n&lt;/quotes&gt;"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="也可以只给句子：&lt;quote text=&quot;只有一句话&quot;/&gt;。导入后出现在「用户添加」里，可在管理页继续编辑。"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Yiyan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="5 · 更新"
+                        android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="进入「设置」会自动检查一次 GitHub Release；也可以手动点「检查 GitHub 更新」，发现有新版本后点「下载并安装更新」，首次安装需允许「安装未知应用」。"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/help_close"
+        style="@style/Widget.Yiyan.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="知道了" />
+</LinearLayout>

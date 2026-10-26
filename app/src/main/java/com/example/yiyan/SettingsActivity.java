@@ -9,11 +9,13 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.slider.Slider;
 
@@ -23,7 +25,11 @@ import java.util.Set;
 
 public class SettingsActivity extends AppCompatActivity {
 
+    private static final int REQUEST_IMPORT_XML = 4401;
+
     private SharedPreferences prefs;
+    private boolean autoChecked;
+    private UpdateChecker.Release latestRelease;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -43,6 +49,8 @@ public class SettingsActivity extends AppCompatActivity {
         bindThemeColor();
         bindAddQuote();
         bindCustomLayout();
+        bindImport();
+        bindUpdate();
         bindRefreshAll();
         bindBottomNav();
     }
@@ -178,10 +186,147 @@ public class SettingsActivity extends AppCompatActivity {
     private void bindBottomNav() {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
-            boolean theme = item.getItemId() == R.id.nav_theme;
-            findViewById(R.id.quotes_panel).setVisibility(theme ? View.GONE : View.VISIBLE);
+            int id = item.getItemId();
+            boolean theme = id == R.id.nav_theme;
+            boolean settings = id == R.id.nav_settings;
+            findViewById(R.id.quotes_panel).setVisibility(
+                    theme || settings ? View.GONE : View.VISIBLE);
             findViewById(R.id.theme_panel).setVisibility(theme ? View.VISIBLE : View.GONE);
+            findViewById(R.id.settings_panel).setVisibility(settings ? View.VISIBLE : View.GONE);
+            if (settings) maybeAutoCheckUpdate();
             return true;
         });
+    }
+
+    // ---- 导入 XML ----
+
+    private void bindImport() {
+        findViewById(R.id.import_xml).setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                    "text/xml", "application/xml", "text/plain", "application/octet-stream"});
+            try {
+                startActivityForResult(intent, REQUEST_IMPORT_XML);
+            } catch (Exception e) {
+                Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_IMPORT_XML || resultCode != RESULT_OK || data == null) return;
+        if (data.getData() == null) return;
+        TextView status = findViewById(R.id.import_status);
+        try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+            if (in == null) throw new java.io.IOException("无法打开文件");
+            QuoteImporter.Result result = QuoteImporter.importXml(this, in);
+            String text;
+            if (result.error != null) {
+                text = "导入失败：" + result.error;
+            } else {
+                text = "导入 " + result.imported + " 条，跳过重复/无效 " + result.skipped + " 条";
+                if (result.imported > 0) {
+                    sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
+                }
+            }
+            status.setText(text);
+            Toast.makeText(this, text, Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            status.setText("导入失败：" + e.getMessage());
+            Toast.makeText(this, "导入失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ---- 检查更新 ----
+
+    private void bindUpdate() {
+        TextView current = findViewById(R.id.update_current);
+        current.setText("当前版本 " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")");
+
+        findViewById(R.id.btn_check_update).setOnClickListener(v -> checkUpdate(false));
+        findViewById(R.id.btn_download_update).setOnClickListener(v -> downloadUpdate());
+        findViewById(R.id.open_help).setOnClickListener(v ->
+                startActivity(new Intent(this, HelpActivity.class)));
+    }
+
+    private void maybeAutoCheckUpdate() {
+        if (autoChecked) return;
+        autoChecked = true;
+        checkUpdate(true);
+    }
+
+    private void checkUpdate(boolean silent) {
+        TextView latest = findViewById(R.id.update_latest);
+        TextView status = findViewById(R.id.update_status);
+        status.setText("正在检查…");
+        new Thread(() -> {
+            try {
+                UpdateChecker.Release release = UpdateChecker.fetchLatest();
+                runOnUiThread(() -> {
+                    this.latestRelease = release;
+                    boolean newer = UpdateChecker.isNewer(release.tag, BuildConfig.VERSION_NAME);
+                    latest.setText("最新版本 " + release.tag + (newer ? "（可更新）" : "（已是最新）"));
+                    status.setText(newer
+                            ? "发现新版本，点击下方按钮下载安装"
+                            : "你已经在使用最新版本");
+                    findViewById(R.id.btn_download_update).setEnabled(newer);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    latest.setText("检查失败");
+                    status.setText("检查失败：" + e.getMessage()
+                            + (silent ? "" : "\n请检查网络后重试"));
+                });
+            }
+        }).start();
+    }
+
+    private void downloadUpdate() {
+        if (latestRelease == null || latestRelease.apkUrl.isEmpty()) return;
+        final UpdateChecker.Release release = latestRelease;
+        TextView status = findViewById(R.id.update_status);
+        MaterialButton button = findViewById(R.id.btn_download_update);
+        button.setEnabled(false);
+        status.setText("开始下载…");
+        new Thread(() -> {
+            try {
+                java.io.File apk = UpdateChecker.download(this, release, (percent, done, total) ->
+                        runOnUiThread(() -> status.setText("正在下载 " + percent + "%")));
+                runOnUiThread(() -> {
+                    status.setText("下载完成，准备安装");
+                    installApk(apk);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    status.setText("下载失败：" + e.getMessage());
+                    button.setEnabled(true);
+                });
+            }
+        }).start();
+    }
+
+    private void installApk(java.io.File apk) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+                && !getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(this, "请先允许安装未知来源应用", Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(
+                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        android.net.Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+        android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                this, getPackageName() + ".files", apk);
+        Intent intent = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 }
