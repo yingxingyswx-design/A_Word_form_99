@@ -1,1 +1,2 @@
-<resources><string name="app_name">DailyLine</string></resources>
+<resources><string name="app_name">DailyLine</string>    <string name="accessibility_widget_locator_desc">读取桌面小组件在屏幕上的位置，用来把玻璃背后的壁纸对齐到桌面。只读取坐标，不读取任何文字或输入。</string>
+</resources>

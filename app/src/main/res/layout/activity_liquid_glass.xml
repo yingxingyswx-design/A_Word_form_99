@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 实时玻璃：背景层 + 玻璃板（RenderEffect + RuntimeShader）+ 叠在上面的文字 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#101014">
+
+    <com.example.yiyan.LiquidGlassBackdrop
+        android:id="@+id/liquid_backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <FrameLayout
+        android:id="@+id/liquid_card"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="top|start">
+
+        <com.example.yiyan.LiquidGlassPane
+            android:id="@+id/liquid_pane"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:padding="26dp">
+
+            <TextView
+                android:id="@+id/liquid_quote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="知者不惑，仁者不忧，勇者不惧。"
+                android:textColor="#FFFFFFFF"
+                android:textSize="26sp"
+                android:shadowColor="#66000000"
+                android:shadowRadius="8"
+                android:shadowDy="2" />
+
+            <TextView
+                android:id="@+id/liquid_meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="— 孔子 · 《论语》 · 实时玻璃"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+            <TextView
+                android:id="@+id/liquid_resize_handle"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="bottom|end"
+                android:gravity="center"
+                android:text="◢"
+                android:textColor="#99FFFFFF"
+                android:textSize="18sp" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="40dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/liquid_close"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="返回"
+            android:textColor="#FFFFFFFF" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="实时玻璃（实验）"
+            android:textColor="#FFFFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:paddingBottom="32dp">
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/liquid_material_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/liquid_material_liquid"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="液态玻璃" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/liquid_material_frost"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="毛玻璃" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/liquid_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="拖动玻璃可以随处移动，拖右下角 ◢ 改长宽；边缘折射是 GPU 每帧算的。"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp" />
+    </LinearLayout>
+</FrameLayout>

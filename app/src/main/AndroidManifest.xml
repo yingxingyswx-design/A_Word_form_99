@@ -2,12 +2,23 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 毛玻璃要读真实壁纸：Android 14 起只有「所有文件访问」拿得到壁纸像素。
+         只供 WallpaperSource 读一张壁纸，不遍历任何文件；不授权时退回壁纸取色。 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
-    <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/></intent></queries>
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/></intent>
+        <intent><action android:name="android.intent.action.PICK"/><data android:mimeType="image/*"/></intent>
+        <intent><action android:name="android.intent.action.GET_CONTENT"/><data android:mimeType="image/*"/></intent>
+    </queries>
     <application android:name=".DailyApp" android:theme="@style/AppTheme" android:label="@string/app_name" android:icon="@mipmap/ic_launcher_v2" android:roundIcon="@mipmap/ic_launcher_round_v2" android:resizeableActivity="true">
         <activity android:name=".ManageQuotesActivity" android:exported="false"/>
         <activity android:name=".LayoutEditorActivity" android:exported="false"/>
         <activity android:name=".HelpActivity" android:exported="false"/>
+        <activity android:name=".LiquidGlassActivity" android:exported="false"/>
+        <activity android:name=".GlassAdvancedActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
         <receiver android:name=".QuoteWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/><action android:name="com.example.yiyan.NEXT_QUOTE"/><action android:name="android.intent.action.USER_PRESENT"/><action android:name="android.intent.action.SCREEN_ON"/><action android:name="android.intent.action.CLOSE_SYSTEM_DIALOGS"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/quote_widget_info"/></receiver>
         <service android:name=".QuoteImageWidgetService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS"/>
@@ -27,5 +38,21 @@
             android:enabled="true"
             android:exported="true"
             android:multiprocess="false" />
+    <service
+            android:name=".WidgetLocatorService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_widget_locator" />
+        </service>
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="把桌面小组件的玻璃换成由桌面进程实时渲染的折射玻璃（Vector / LSPosed）" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
     </application>
 </manifest>

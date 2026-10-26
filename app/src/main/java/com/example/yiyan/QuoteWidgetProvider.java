@@ -11,6 +11,7 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -39,6 +40,11 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_PIN_RESULT = "com.example.yiyan.PIN_RESULT";
 
     private static final String TAG = "99YIYAN_LOG";
+
+    /** 全分辨率渲染一次要一两秒，缓存住：参数没变就直接复用，点一下换句不会卡。 */
+    private static String cachedGlassKey;
+    private static Bitmap cachedGlass;
+
     /** launcher 会在上报的小组件尺寸之外再扣一圈宿主内边距，这里按 dp 估一个值。 */
     private static final int HOST_INSET_DP = 8;
 
@@ -102,8 +108,30 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         update(context, manager, widgetId);
     }
 
+    /** 把玻璃参数广播给 launcher 里的 Vector/LSPosed 模块（它没有 root，读不了我们的 prefs）。 */
+    static void sendGlassConfig(Context context, SharedPreferences prefs) {
+        Intent intent = new Intent("com.example.yiyan.GLASS_CONFIG");
+        intent.putExtra("xposedGlass", prefs.getBoolean("xposedGlass", false));
+        intent.putExtra("glassMaterial", prefs.getString(GlassRenderer.KEY_MATERIAL,
+                GlassRenderer.MATERIAL_FROST));
+        intent.putExtra("glassBlur", prefs.getInt(GlassRenderer.KEY_BLUR, GlassRenderer.DEFAULT_BLUR));
+        intent.putExtra("glassDensity", prefs.getInt(GlassRenderer.KEY_DENSITY,
+                GlassRenderer.DEFAULT_DENSITY));
+        intent.putExtra("glassHighlight", prefs.getInt(GlassRenderer.KEY_HIGHLIGHT,
+                GlassRenderer.DEFAULT_HIGHLIGHT));
+        intent.putExtra("glassCorner", prefs.getInt(GlassRenderer.KEY_CORNER,
+                GlassRenderer.DEFAULT_CORNER));
+        intent.putExtra("glassTone", prefs.getString(GlassRenderer.KEY_TONE, GlassRenderer.TONE_AUTO));
+        try {
+            context.sendBroadcast(intent);
+        } catch (Exception e) {
+            Log.w(TAG, "广播玻璃配置失败：" + e);
+        }
+    }
+
     private void update(Context context, AppWidgetManager manager, int widgetId) {
         SharedPreferences prefs = context.getSharedPreferences("settings", 0);
+        sendGlassConfig(context, prefs);
         List<Quote> candidates = candidates(context, prefs);
 
         boolean onlineRandom = prefs.getBoolean("onlineRandom", false);
@@ -166,24 +194,87 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         // 液态玻璃：根背景转透明，让壁纸从玻璃层下面透出来；玻璃位图按小组件实际尺寸现渲染
         float density = context.getResources().getDisplayMetrics().density;
         int[] sizeDp = widgetSizeDp(manager, widgetId);
-        GlassRenderer.Spec glassSpec = GlassRenderer.enabled(prefs)
+        boolean hasCustomBg = CustomBackground.enabled(prefs);
+        Bitmap customBg = null;
+        if (hasCustomBg) {
+            try {
+                customBg = CustomBackground.load(context, prefs);
+                Log.i(TAG, "自定义背景加载：" + (customBg == null ? "失败" : customBg.getWidth() + "x" + customBg.getHeight()));
+            } catch (Throwable t) {
+                Log.w(TAG, "自定义背景加载异常", t);
+            }
+        }
+        // 互斥：启用自定义背景时不再走玻璃；启用玻璃时忽略自定义背景
+        GlassRenderer.Spec glassSpec = (customBg == null && GlassRenderer.enabled(prefs))
                 ? GlassRenderer.spec(context, prefs) : null;
         int frameBackground = background;
-        if (glassSpec != null) {
+        if (customBg != null) {
+            int cardW = Math.round(sizeDp[0] * density);
+            int cardH = Math.round(sizeDp[1] * density);
+            Bitmap card = null;
+            try {
+                card = CustomBackground.renderCard(context, cardW, cardH, customBg,
+                        CustomBackground.blurred(prefs), CustomBackground.blurAmount(prefs),
+                        prefs.getInt(GlassRenderer.KEY_CORNER, GlassRenderer.DEFAULT_CORNER));
+            } catch (Throwable t) {
+                Log.w(TAG, "自定义背景渲染失败", t);
+            }
+            if (card == null) {
+                views.setViewVisibility(R.id.glass_bg, View.GONE);
+                customBg = null;
+            } else {
+            views.setImageViewBitmap(R.id.glass_bg, card);
+            views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
+                Log.i(TAG, "背景=自定义卡片 " + cardW + "x" + cardH
+                        + (CustomBackground.blurred(prefs)
+                        ? " 高斯模糊 " + CustomBackground.blurAmount(prefs) + "%" : " 原图"));
+            }
+        } else if (glassSpec != null) {
+            Bitmap wallpaper = WallpaperSource.load(context, 800);
+            // 把壁纸裁到小组件在桌面上的位置：玻璃里的折射才和桌面严丝合缝
+            Rect crop = null;
+            if (wallpaper != null) {
+                Rect widgetRect = GlassAlign.widgetScreenRect(context, prefs, sizeDp);
+                if (widgetRect != null) {
+                    crop = GlassAlign.wallpaperCrop(wallpaper,
+                            context.getResources().getDisplayMetrics().widthPixels,
+                            context.getResources().getDisplayMetrics().heightPixels,
+                            widgetRect);
+                    Log.i(TAG, "壁纸采样 " + crop + " ← 小组件 " + widgetRect);
+                }
+            }
             Log.i(TAG, "玻璃材质=" + glassSpec.material + " " + sizeDp[0] + "x" + sizeDp[1] + "dp tone="
                     + (glassSpec.dark ? "dark" : "light")
                     + " blur=" + Math.round(glassSpec.blur * 100)
-                    + " density=" + Math.round(glassSpec.density * 100));
-            // 透明底：壁纸由桌面实时透出来，玻璃只画自己的光学层
-            Bitmap glassBitmap = GlassRenderer.render(context,
-                    Math.round(sizeDp[0] * density), Math.round(sizeDp[1] * density),
-                    glassSpec);
+                    + " density=" + Math.round(glassSpec.density * 100)
+                    + " 壁纸=" + (wallpaper == null ? "不可用" :
+                    wallpaper.getWidth() + "x" + wallpaper.getHeight()));
+            int glassW = Math.round(sizeDp[0] * density);
+            int glassH = Math.round(sizeDp[1] * density);
+            String glassKey = glassW + "x" + glassH + "|" + glassSpec.material + "|"
+                    + glassSpec.blur + "|" + glassSpec.density + "|" + glassSpec.highlight
+                    + "|" + glassSpec.cornerDp + "|" + glassSpec.dark
+                    + "|" + System.identityHashCode(wallpaper)
+                    + "|" + (crop == null ? "-" : crop.toShortString());
+            long startedAt = System.currentTimeMillis();
+            Bitmap glassBitmap;
+            if (glassKey.equals(cachedGlassKey) && cachedGlass != null && !cachedGlass.isRecycled()) {
+                glassBitmap = cachedGlass;
+            } else {
+                glassBitmap = GlassRenderer.render(context, glassW, glassH, glassSpec, wallpaper, crop);
+                cachedGlassKey = glassKey;
+                cachedGlass = glassBitmap;
+                Log.i(TAG, "玻璃重渲染 " + glassW + "x" + glassH + " 用时 "
+                        + (System.currentTimeMillis() - startedAt) + "ms");
+            }
             Log.i(TAG, "glass bitmap " + glassBitmap.getWidth() + "x" + glassBitmap.getHeight()
                     + " centerAlpha=" + android.graphics.Color.alpha(glassBitmap.getPixel(
                     glassBitmap.getWidth() / 2, glassBitmap.getHeight() / 2)));
             views.setImageViewBitmap(R.id.glass_bg, glassBitmap);
             views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
             frameBackground = GlassRenderer.solidFill(glassSpec);
+
+
         } else {
             views.setViewVisibility(R.id.glass_bg, View.GONE);
         }
@@ -197,10 +288,15 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             animated = applyImage(context, widgetId, views, quote, frameBackground);
         }
 
-        if (glassSpec != null) {
-            views.setTextColor(R.id.quote_text, GlassRenderer.textColor(glassSpec));
-            views.setTextColor(R.id.quote_meta, GlassRenderer.metaColor(glassSpec));
-            views.setTextColor(R.id.next_hint, GlassRenderer.hintColor(glassSpec));
+        if (glassSpec != null || customBg != null) {
+            boolean darkTone = glassSpec != null ? glassSpec.dark
+                    : GlassRenderer.isDark(context, prefs);
+            GlassRenderer.Spec toneSpec = glassSpec != null ? glassSpec
+                    : GlassRenderer.spec(context, prefs);
+            toneSpec.dark = darkTone;
+            views.setTextColor(R.id.quote_text, GlassRenderer.textColor(toneSpec));
+            views.setTextColor(R.id.quote_meta, GlassRenderer.metaColor(toneSpec));
+            views.setTextColor(R.id.next_hint, GlassRenderer.hintColor(toneSpec));
             views.setInt(R.id.widget_root, "setBackgroundColor", Color.TRANSPARENT);
         } else {
             views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);

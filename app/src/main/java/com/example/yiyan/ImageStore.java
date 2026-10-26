@@ -87,8 +87,11 @@ final class ImageStore {
             String name = UUID.randomUUID().toString().replace("-", "") + extensionFor(mime, uri);
             target = new File(dir(context), name);
 
-            in = context.getContentResolver().openInputStream(uri);
-            if (in == null) return null;
+            in = openStream(context, uri);
+            if (in == null) {
+                Log.w(TAG, "导入配图失败：打不开输入流 " + uri);
+                return null;
+            }
             out = new FileOutputStream(target);
 
             byte[] buffer = new byte[16 * 1024];
@@ -115,6 +118,27 @@ final class ImageStore {
             closeQuietly(in);
             closeQuietly(out);
         }
+    }
+
+    /**
+     * 相册（Photo Picker）返回的 Uri 有些 ROM 上直接 openInputStream 会抛 SecurityException，
+     * 这里再走一次 openFileDescriptor 兜底。
+     */
+    private static InputStream openStream(Context context, Uri uri) {
+        try {
+            InputStream in = context.getContentResolver().openInputStream(uri);
+            if (in != null) return in;
+        } catch (Exception e) {
+            Log.w(TAG, "openInputStream 失败，改用 openFileDescriptor：" + e);
+        }
+        try {
+            android.os.ParcelFileDescriptor pfd =
+                    context.getContentResolver().openFileDescriptor(uri, "r");
+            if (pfd != null) return new java.io.FileInputStream(pfd.getFileDescriptor());
+        } catch (Exception e) {
+            Log.w(TAG, "openFileDescriptor 也失败：" + e);
+        }
+        return null;
     }
 
     static void delete(Context context, String name) {

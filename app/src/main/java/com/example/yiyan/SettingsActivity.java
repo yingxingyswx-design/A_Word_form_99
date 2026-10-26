@@ -3,6 +3,7 @@ package com.example.yiyan;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -26,11 +27,21 @@ import java.util.Set;
 public class SettingsActivity extends AppCompatActivity {
 
     private static final int REQUEST_IMPORT_XML = 4401;
+    private static final int REQUEST_PICK_BACKGROUND = 4402;
     private static final String KEY_UPDATE_CHANNEL = "updateChannel";
 
 
+    /** 官方推荐的相册选择器：避免 startActivityForResult 在部分 ROM 上拿不到结果。 */
+    private final androidx.activity.result.ActivityResultLauncher<androidx.activity.result.PickVisualMediaRequest> photoPicker =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+                    uri -> {
+                        if (uri == null) return;
+                        onBackgroundPicked(uri);
+                    });
+
     private SharedPreferences prefs;
     private boolean autoChecked;
+    private boolean wallpaperGranted;
     private UpdateChecker.Release latestRelease;
 
     private final android.os.Handler refreshHandler =
@@ -57,6 +68,8 @@ public class SettingsActivity extends AppCompatActivity {
         bindMonet();
         bindThemeColor();
         bindGlass();
+        bindGlassPermission();
+        bindCustomBackground();
         bindRootHomeWatch();
         bindAddQuote();
         bindCustomLayout();
@@ -100,6 +113,13 @@ public class SettingsActivity extends AppCompatActivity {
         enabled.setChecked(GlassRenderer.enabled(prefs));
         enabled.setOnCheckedChangeListener((button, checked) -> {
             prefs.edit().putBoolean(GlassRenderer.KEY_ENABLED, checked).apply();
+            if (checked) {
+                // 互斥：开玻璃就关掉自定义背景
+                prefs.edit().putBoolean(CustomBackground.KEY_ENABLED, false).apply();
+                syncCustomBackgroundSwitch();
+                refreshCustomBackgroundStatus();
+                refreshPreviewBackdrop();
+            }
             previewSpec();
             scheduleWidgetRefresh();
             Toast.makeText(this, checked
@@ -121,11 +141,21 @@ public class SettingsActivity extends AppCompatActivity {
             prefs.edit().putString(GlassRenderer.KEY_MATERIAL, value).apply();
             previewSpec();
             scheduleWidgetRefresh();
-            Toast.makeText(this, GlassRenderer.MATERIAL_LIQUID.equals(value)
-                            ? "已切换：液态玻璃（透明，桌面壁纸实时透出）"
-                            : "已切换：毛玻璃（真实壁纸模糊）",
-                    Toast.LENGTH_SHORT).show();
+            if (GlassRenderer.MATERIAL_FROST.equals(value) && !WallpaperSource.canRead(this)) {
+                Toast.makeText(this, "毛玻璃要读壁纸才能模糊：请点下面的「去授权」",
+                        Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, GlassRenderer.MATERIAL_LIQUID.equals(value)
+                                ? "已切换：液态玻璃（透明，桌面壁纸实时透出）"
+                                : "已切换：毛玻璃（真实壁纸模糊）",
+                        Toast.LENGTH_SHORT).show();
+            }
         });
+
+        findViewById(R.id.open_live_glass).setOnClickListener(v ->
+                startActivity(new Intent(this, LiquidGlassActivity.class)));
+        findViewById(R.id.open_glass_advanced).setOnClickListener(v ->
+                startActivity(new Intent(this, GlassAdvancedActivity.class)));
 
         bindGlassSlider(R.id.glass_blur, R.id.glass_blur_label, "雾面程度",
                 GlassRenderer.KEY_BLUR, GlassRenderer.DEFAULT_BLUR, "%");
@@ -177,6 +207,169 @@ public class SettingsActivity extends AppCompatActivity {
         preview.setSpec(spec, GlassRenderer.enabled(prefs));
     }
 
+    /**
+     * 毛玻璃要读壁纸位图：Android 14 起只有「所有文件访问」拿得到壁纸像素。
+     * 这里只做一件事——把授权入口摆出来、把状态说清楚，不授权也能用取色兜底。
+     */
+    private void bindGlassPermission() {
+        wallpaperGranted = WallpaperSource.canRead(this);
+        findViewById(R.id.glass_wallpaper_grant).setOnClickListener(v -> {
+            try {
+                startActivity(WallpaperSource.permissionIntent(this));
+            } catch (Exception e) {
+                Toast.makeText(this, "打不开授权页，请到系统设置里手动打开「所有文件访问」",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+        refreshWallpaperPermission();
+    }
+
+    private void refreshWallpaperPermission() {
+        boolean granted = WallpaperSource.canRead(this);
+        TextView status = findViewById(R.id.glass_wallpaper_status);
+        status.setText(granted
+                ? "壁纸读取：已授权 · 毛玻璃会真的模糊桌面壁纸"
+                : "壁纸读取：未授权 · 毛玻璃只会取壁纸颜色，不会模糊");
+        findViewById(R.id.glass_wallpaper_grant).setEnabled(!granted);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (prefs == null) return;
+        boolean granted = WallpaperSource.canRead(this);
+        refreshWallpaperPermission();
+        if (granted && !wallpaperGranted) {
+            wallpaperGranted = true;
+            WallpaperSource.invalidate();
+            GlassPreviewView preview = findViewById(R.id.glass_preview);
+            if (preview != null) preview.invalidateWallpaper();
+            scheduleWidgetRefresh();
+            Toast.makeText(this, "已授权：毛玻璃现在会用真实壁纸做模糊", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** 自定义背景：图片 / GIF（首帧），可选高斯模糊与强度；和玻璃材质互斥。 */
+    private void bindCustomBackground() {
+        final MaterialSwitch enabled = findViewById(R.id.custom_bg_enabled);
+        final MaterialSwitch blur = findViewById(R.id.custom_bg_blur);
+        final Slider amount = findViewById(R.id.custom_bg_blur_amount);
+        final TextView label = findViewById(R.id.custom_bg_blur_label);
+
+        // 必须先选图，才能打开「使用自定义背景」
+        boolean hasImage = imageSelected();
+        enabled.setEnabled(hasImage);
+        enabled.setChecked(hasImage && CustomBackground.enabled(prefs));
+        blur.setChecked(CustomBackground.blurred(prefs));
+        amount.setValue(CustomBackground.blurAmount(prefs));
+        label.setText("模糊程度 · " + Math.round(amount.getValue()) + "%");
+        refreshCustomBackgroundStatus();
+
+        findViewById(R.id.custom_bg_pick).setOnClickListener(v -> {
+            try {
+                photoPicker.launch(new androidx.activity.result.PickVisualMediaRequest.Builder()
+                        .setMediaType(androidx.activity.result.contract.ActivityResultContracts
+                                .PickVisualMedia.ImageOnly.INSTANCE)
+                        .build());
+            } catch (Exception e) {
+                if (!ImagePicker.pick(this, REQUEST_PICK_BACKGROUND)) {
+                    Toast.makeText(this, "没有可用的相册选择器", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        enabled.setOnCheckedChangeListener((button, checked) -> {
+            prefs.edit().putBoolean(CustomBackground.KEY_ENABLED, checked).apply();
+            if (checked) {
+                // 互斥：开自定义背景就关掉玻璃材质
+                prefs.edit().putBoolean(GlassRenderer.KEY_ENABLED, false).apply();
+                syncGlassSwitch();
+                previewSpec();
+            }
+            CustomBackground.invalidate();
+            refreshPreviewBackdrop();
+            refreshCustomBackgroundStatus();
+            scheduleWidgetRefresh();
+        });
+        blur.setOnCheckedChangeListener((button, checked) -> {
+            prefs.edit().putBoolean(CustomBackground.KEY_BLUR, checked).apply();
+            CustomBackground.invalidate();
+            refreshPreviewBackdrop();
+            refreshCustomBackgroundStatus();
+            scheduleWidgetRefresh();
+        });
+        amount.addOnChangeListener((slider, value, fromUser) -> {
+            int rounded = Math.round(value);
+            label.setText("模糊程度 · " + rounded + "%");
+            prefs.edit().putInt(CustomBackground.KEY_BLUR_AMOUNT, rounded).apply();
+            if (CustomBackground.blurred(prefs)) {
+                CustomBackground.invalidate();
+                refreshPreviewBackdrop();
+                refreshCustomBackgroundStatus();
+                scheduleWidgetRefresh();
+            }
+        });
+    }
+
+    /** 选择器回调统一走这里：复制到私有目录 → 写 prefs → 打开开关 → 刷新。 */
+    private void onBackgroundPicked(android.net.Uri picked) {
+        String name = ImageStore.importFrom(this, picked);
+        boolean exists = name != null && ImageStore.exists(this, name);
+        android.util.Log.i("99YIYAN_LOG", "背景 pick: uri=" + picked + " name=" + name
+                + " exists=" + exists);
+        if (name == null) {
+            Toast.makeText(this, "这张图读不了（或超过 16MB）", Toast.LENGTH_LONG).show();
+            return;
+        }
+        prefs.edit()
+                .putString(CustomBackground.KEY_NAME, name)
+                .putBoolean(CustomBackground.KEY_ENABLED, true)
+                .apply();
+        MaterialSwitch switchOn = findViewById(R.id.custom_bg_enabled);
+        if (switchOn != null) {
+            switchOn.setEnabled(true);
+            switchOn.setChecked(true);
+        }
+        CustomBackground.invalidate();
+        refreshCustomBackgroundStatus();
+        refreshPreviewBackdrop();
+        scheduleWidgetRefresh();
+        Toast.makeText(this, "已设为玻璃背景" + (CustomBackground.blurred(prefs) ? "（高斯模糊）" : ""),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void syncGlassSwitch() {
+        MaterialSwitch glass = findViewById(R.id.glass_enabled);
+        if (glass != null) glass.setChecked(GlassRenderer.enabled(prefs));
+    }
+
+    private boolean imageSelected() {
+        // 只要曾经选过就允许打开开关；文件真丢了渲染时会自动回退，并在状态行提示
+        return !CustomBackground.name(prefs).isEmpty();
+    }
+
+    private void syncCustomBackgroundSwitch() {
+        MaterialSwitch bg = findViewById(R.id.custom_bg_enabled);
+        if (bg != null) bg.setChecked(CustomBackground.enabled(prefs));
+    }
+
+    private void refreshPreviewBackdrop() {
+        GlassPreviewView preview = findViewById(R.id.glass_preview);
+        if (preview != null) preview.invalidateWallpaper();
+    }
+
+    private void refreshCustomBackgroundStatus() {
+        TextView status = findViewById(R.id.custom_bg_status);
+        if (status == null) return;
+        String name = CustomBackground.name(prefs);
+        boolean has = !name.isEmpty() && ImageStore.exists(this, name);
+        String blurText = CustomBackground.blurred(prefs)
+                ? "高斯模糊 " + CustomBackground.blurAmount(prefs) + "%" : "不模糊";
+        status.setText(has
+                ? "自定义背景：" + name + " · "
+                + (CustomBackground.enabled(prefs) ? "使用中 · " : "未启用 · ") + blurText
+                : "自定义背景：未设置（GIF 目前取第一帧）");
+    }
     /** 回桌面自动换一句：root 常驻脚本监听焦点窗口，见 {@link RootHomeWatcher}。 */
     private void bindRootHomeWatch() {
         final MaterialSwitch watch = findViewById(R.id.root_home_watch);

@@ -463,13 +463,8 @@ public class ManageQuotesActivity extends AppCompatActivity {
     }
 
     private void pickImage() {
-        // SAF：不需要存储权限，也不依赖返回的临时授权（字节会被立刻复制到私有目录）
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
-        try {
-            startActivityForResult(intent, REQUEST_PICK_IMAGE);
-        } catch (Exception e) {
+        // 系统相册（Photo Picker）：只显示图片 / GIF，不需要存储权限
+        if (!ImagePicker.pick(this, REQUEST_PICK_IMAGE)) {
             Toast.makeText(this, "没有可用的图片选择器", Toast.LENGTH_SHORT).show();
         }
     }

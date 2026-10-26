@@ -85,21 +85,17 @@ public class LayoutEditorActivity extends AppCompatActivity {
             Toast.makeText(this, "最多放 " + MAX_IMAGES + " 张图片", Toast.LENGTH_SHORT).show();
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
-        try {
-            startActivityForResult(intent, REQUEST_PICK_IMAGE);
-        } catch (Exception e) {
-            Toast.makeText(this, "没有可用的图片选择器", Toast.LENGTH_SHORT).show();
+        // 走系统相册（Google Photos / 图库），不要文件管理器
+        if (!ImagePicker.pick(this, REQUEST_PICK_IMAGE)) {
+            Toast.makeText(this, "没有可用的相册选择器", Toast.LENGTH_SHORT).show();
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_PICK_IMAGE || resultCode != RESULT_OK || data == null) return;
-        Uri uri = data.getData();
+        if (requestCode != REQUEST_PICK_IMAGE || resultCode != RESULT_OK) return;
+        Uri uri = ImagePicker.uriFrom(data);
         if (uri == null) return;
 
         String name = ImageStore.importFrom(this, uri);

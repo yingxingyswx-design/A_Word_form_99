@@ -25,3 +25,14 @@
 
 - 应用名：每日一言 / DailyLine
 - 仓库：<https://github.com/yingxingyswx-design/DailyLine_chinese>
+
+## 实时玻璃着色器：FletchMcKee/liquid
+
+「实时玻璃」页的 AGSL 着色器（`LiquidGlassPane.AGSL`）取自 **liquid**，也就是 FolkPatch 用的同一个库：
+
+- 仓库：<https://github.com/FletchMcKee/liquid>
+- 文件：`liquid/src/commonMain/kotlin/io/github/fletchmckee/liquid/internal/LiquidShader.kt`
+- 授权：**Apache-2.0**（见上游 LICENSE）
+- 用法：原样搬运着色器，Java 侧的 `RuntimeShader` + `RenderEffect.createChainEffect(shader, blur)` 组合与上游 `LiquidElement.android.kt` 的做法一致。
+
+按 Apache-2.0 要求保留署名，并在本文件说明来源。

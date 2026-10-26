@@ -314,13 +314,47 @@
                                 android:text="液态玻璃" />
                         </com.google.android.material.button.MaterialButtonToggleGroup>
 
+                        <TextView
+                            android:id="@+id/glass_wallpaper_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="壁纸读取：未授权 · 毛玻璃只会取壁纸颜色，不会模糊"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/glass_wallpaper_grant"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="去授权读取壁纸" />
                         <com.example.yiyan.GlassPreviewView
                             android:id="@+id/glass_preview"
                             android:layout_width="match_parent"
                             android:layout_height="132dp"
                             android:layout_marginTop="12dp" />
 
-                        <TextView
+                        
+
+                                                <com.google.android.material.button.MaterialButton
+                            android:id="@+id/open_glass_advanced"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="玻璃高级设置（对齐 / 扩展）" />
+
+                                                <com.google.android.material.button.MaterialButton
+                            android:id="@+id/open_live_glass"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="实时玻璃（实验）：占满屏幕，GPU 每帧折射" />
+
+                       <TextView
                             android:id="@+id/glass_blur_label"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -426,13 +460,88 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="小组件是透明底：桌面壁纸实时从玻璃下面透出来，不读壁纸、不截屏。边框、顶部反光条、内发光、磨砂这些光学层每次刷新实时重算；预览里的底色只是示意。"
+                            android:text="小组件在系统层面拿不到身后的实时画面，毛玻璃是「读一张壁纸 → 自己模糊 + 逐像素折射」，每次刷新重算；想要逐帧实时折射，点上面的「打开实时玻璃页」，那里用 GPU 的 RuntimeShader 每帧算（液态 / 毛玻璃都在）。"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-
                 <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Yiyan.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="自定义背景"
+                            android:textAppearance="@style/TextAppearance.Yiyan.Section" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="用图片 / GIF（首帧）当小组件背景，可选高斯模糊与强度。开启后会替代玻璃材质，两者互斥。"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+<TextView
+                            android:id="@+id/custom_bg_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="自定义背景：未设置"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/custom_bg_pick"
+                            style="@style/Widget.Yiyan.Button.Tonal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="选一张图片 / GIF 当玻璃背景" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/custom_bg_enabled"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="使用自定义背景（替代桌面壁纸）"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/custom_bg_blur"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="高斯模糊"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <TextView
+                            android:id="@+id/custom_bg_blur_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="模糊程度 · 40%"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/custom_bg_blur_amount"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:stepSize="1"
+                            android:valueFrom="0"
+                            android:valueTo="100" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                
+
+               <com.google.android.material.card.MaterialCardView
                     style="@style/Widget.Yiyan.Card"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

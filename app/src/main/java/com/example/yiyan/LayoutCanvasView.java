@@ -177,12 +177,14 @@ public class LayoutCanvasView extends View {
         int w = Math.max(1, Math.round(widgetRect.width()));
         int h = Math.max(1, Math.round(widgetRect.height()));
         GlassRenderer.Spec spec = GlassRenderer.spec(getContext(), prefs);
-        String signature = spec.blur + "/" + spec.density + "/" + spec.highlight
+        String signature = spec.material + "/" + spec.blur + "/" + spec.density + "/" + spec.highlight
                 + "/" + spec.cornerDp + "/" + spec.dark;
         if (glassBitmap == null || glassWidth != w || glassHeight != h
                 || !signature.equals(glassSignature)) {
             if (glassBitmap != null) glassBitmap.recycle();
-            glassBitmap = GlassRenderer.render(getContext(), w, h, spec);
+            // 毛玻璃要用真实壁纸做模糊底，编辑器里看到的和桌面一致
+            Bitmap wallpaper = spec.isFrost() ? WallpaperSource.load(getContext(), 800) : null;
+            glassBitmap = GlassRenderer.render(getContext(), w, h, spec, wallpaper);
             glassWidth = w;
             glassHeight = h;
             glassSignature = signature;
