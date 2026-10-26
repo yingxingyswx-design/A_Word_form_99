@@ -1,7 +1,9 @@
 package com.example.yiyan;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -51,5 +53,37 @@ public abstract class ThemedActivity extends AppCompatActivity {
     /** 子类在 onResume 里发现这个标记时不要再做一次 switch 同步，避免重复 recreate。 */
     protected final boolean isThemeChangePending() {
         return themeChangePending;
+    }
+
+    // ---- 页面切换：从右侧平滑进入，返回时向右滑出 ----
+
+    @Override
+    public void startActivity(Intent intent) {
+        super.startActivity(intent);
+        applyOpenTransition();
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        applyCloseTransition();
+    }
+
+    private void applyOpenTransition() {
+        if (Build.VERSION.SDK_INT >= 34) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN,
+                    R.anim.slide_in_right, R.anim.slide_out_left);
+        } else {
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+        }
+    }
+
+    private void applyCloseTransition() {
+        if (Build.VERSION.SDK_INT >= 34) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE,
+                    R.anim.slide_in_left, R.anim.slide_out_right);
+        } else {
+            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+        }
     }
 }

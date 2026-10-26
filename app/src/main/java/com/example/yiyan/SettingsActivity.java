@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -44,6 +45,11 @@ public class SettingsActivity extends ThemedActivity {
     private boolean autoChecked;
     private boolean wallpaperGranted;
     private UpdateChecker.Release latestRelease;
+
+    /** 底部 Tab 的三个面板，切换时做同方向的平滑滑动。 */
+    private static final int[] PANEL_IDS = {
+            R.id.quotes_panel, R.id.theme_panel, R.id.settings_panel};
+    private int currentPanelIndex = 0;
 
     private final android.os.Handler refreshHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
@@ -659,15 +665,56 @@ public class SettingsActivity extends ThemedActivity {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
-            boolean theme = id == R.id.nav_theme;
-            boolean settings = id == R.id.nav_settings;
-            findViewById(R.id.quotes_panel).setVisibility(
-                    theme || settings ? View.GONE : View.VISIBLE);
-            findViewById(R.id.theme_panel).setVisibility(theme ? View.VISIBLE : View.GONE);
-            findViewById(R.id.settings_panel).setVisibility(settings ? View.VISIBLE : View.GONE);
-            if (settings) maybeAutoCheckUpdate();
+            int index = id == R.id.nav_theme ? 1 : id == R.id.nav_settings ? 2 : 0;
+            switchPanel(index);
+            if (index == 2) maybeAutoCheckUpdate();
             return true;
         });
+    }
+
+    /** 面板切换：新页面从滑动方向进入，旧页面反向退场，避免生硬地 GONE/VISIBLE 跳变。 */
+    private void switchPanel(int index) {
+        if (index == currentPanelIndex) return;
+        final int direction = index > currentPanelIndex ? 1 : -1;
+        final int offset = Math.round(42 * getResources().getDisplayMetrics().density);
+        final int smallOffset = Math.round(24 * getResources().getDisplayMetrics().density);
+
+        for (int id : PANEL_IDS) findViewById(id).animate().cancel();
+
+        final View incoming = findViewById(PANEL_IDS[index]);
+        final View outgoing = findViewById(PANEL_IDS[currentPanelIndex]);
+        for (int i = 0; i < PANEL_IDS.length; i++) {
+            if (i == index || i == currentPanelIndex) continue;
+            View hidden = findViewById(PANEL_IDS[i]);
+            hidden.setVisibility(View.GONE);
+            hidden.setAlpha(1f);
+            hidden.setTranslationX(0f);
+        }
+
+        incoming.setVisibility(View.VISIBLE);
+        incoming.setAlpha(0f);
+        incoming.setTranslationX(direction * offset);
+        incoming.bringToFront();
+        incoming.animate()
+                .alpha(1f)
+                .translationX(0f)
+                .setDuration(280)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+
+        outgoing.animate()
+                .alpha(0f)
+                .translationX(-direction * smallOffset)
+                .setDuration(190)
+                .setInterpolator(new DecelerateInterpolator())
+                .withEndAction(() -> {
+                    outgoing.setVisibility(View.GONE);
+                    outgoing.setAlpha(1f);
+                    outgoing.setTranslationX(0f);
+                })
+                .start();
+
+        currentPanelIndex = index;
     }
 
     // ---- 导入 XML ----

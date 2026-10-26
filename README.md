@@ -125,6 +125,7 @@ HyperOS、HarmonyOS、ColorOS、OriginOS 等桌面默认把小组件放在 2×2 
 - **主题色**：`ThemeColors` 统一管理色卡、取色器和桌面强调色。选择色卡会写入 `themeColor` 并关闭 `monet`，立即广播刷新小组件；`ColorPickerView` 增加了跟手触摸点、色相条游标，并在 `setColor()` 时正确回填初始 HSV。
 - **App 界面换色**：`ThemedActivity` 在 `attachBaseContext` 里用 `ColorResourcesOverride` 注入由种子色生成的 M3 配色，再 force 应用 `ThemeOverlay.Yiyan.CustomColors`，覆盖 Material personalized colors 对 `colorPrimary` 和文字色的改写。这样设置页、管理页、编辑器、帮助页的按钮 / 开关 / 滑块 / 底栏都会跟随主题色，而不只是小组件作者行。
 - **浅色模式**：App 背景使用纯白 `#FFFFFF`，卡片使用中性浅灰 `#F6F6F8`，不再使用米白 / 奶油色；深色模式保持原有暗色表面。
+- **过渡动画**：底部 Tab 切换使用同方向平滑滑动；二级页面从右侧滑入、返回时向右滑出。
 - **深色模式修复**：以前深色模式会把主题色强制覆盖成固定的 `#D0BCFF`，自定义色实际不生效。现在只在亮度过低时提高明度，色相保留；浅色模式下过亮的颜色会被压暗。
 - **背景样式**：`CustomBackground` 新增 `solid` / `gradient` 两种类型。纯色和渐变不经过图片解码和模糊，而是用 `LinearGradient` 按小组件实际宽高、圆角和角度现画；渐变卡片、纯色色卡、自定义取色器都是即时应用。
 - **可读性**：纯色/渐变背景会根据平均亮度选择深色或浅色正文，作者行使用用户主题色并按背景明度校正；图片背景继续沿用原来的玻璃色调逻辑。
