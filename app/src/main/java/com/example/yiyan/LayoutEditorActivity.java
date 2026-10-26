@@ -23,6 +23,7 @@ public class LayoutEditorActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_layout_editor);
+        ScreenInsets.applyTo(this);
         prefs = getSharedPreferences("settings", 0);
 
         canvas = findViewById(R.id.layout_canvas);

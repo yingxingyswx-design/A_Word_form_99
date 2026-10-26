@@ -29,6 +29,7 @@ public class SettingsActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+        ScreenInsets.applyTo(this);
         prefs = getSharedPreferences("settings", 0);
 
         findViewById(R.id.manage_quotes).setOnClickListener(v -> startActivity(new Intent(this, ManageQuotesActivity.class)));

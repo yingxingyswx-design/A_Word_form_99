@@ -54,20 +54,20 @@
 
         <ImageView
             android:id="@+id/quote_image"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="78dp"
+            android:layout_height="78dp"
             android:scaleType="centerCrop"
             android:visibility="gone"
             android:contentDescription="@null" />
 
         <AdapterViewFlipper
             android:id="@+id/quote_image_flipper"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="78dp"
+            android:layout_height="78dp"
             android:autoStart="true"
             android:flipInterval="200"
-            android:inAnimation="@android:anim/fade_in"
-            android:outAnimation="@android:anim/fade_out"
+            android:inAnimation="@android:animator/fade_in"
+            android:outAnimation="@android:animator/fade_out"
             android:visibility="gone" />
     </FrameLayout>
 

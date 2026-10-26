@@ -69,8 +69,8 @@
             android:layout_height="match_parent"
             android:autoStart="true"
             android:flipInterval="200"
-            android:inAnimation="@android:anim/fade_in"
-            android:outAnimation="@android:anim/fade_out"
+            android:inAnimation="@android:animator/fade_in"
+            android:outAnimation="@android:animator/fade_out"
             android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

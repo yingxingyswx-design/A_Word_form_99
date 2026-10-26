@@ -62,6 +62,7 @@ public class ManageQuotesActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_manage_quotes);
+        ScreenInsets.applyTo(this);
         prefs = getSharedPreferences("settings", 0);
         flow = findViewById(R.id.quotes_flow);
 

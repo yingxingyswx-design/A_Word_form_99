@@ -10,8 +10,13 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.text.StaticLayout;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.util.Log;
+import android.util.SizeF;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -31,6 +36,8 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_PIN_RESULT = "com.example.yiyan.PIN_RESULT";
 
     private static final String TAG = "99YIYAN_LOG";
+    /** launcher 会在上报的小组件尺寸之外再扣一圈宿主内边距，这里按 dp 估一个值。 */
+    private static final int HOST_INSET_DP = 8;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
@@ -52,6 +59,17 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 update(context, manager, id);
             }
         }
+    }
+
+    /**
+     * 拖动改变小组件大小时必须重绘：位置是按尺寸算成 padding 的，
+     * 不重算就会沿用旧尺寸，出现「按最大尺寸排版、缩小后被裁掉」。
+     */
+    @Override
+    public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager,
+                                          int widgetId, Bundle newOptions) {
+        super.onAppWidgetOptionsChanged(context, manager, widgetId, newOptions);
+        update(context, manager, widgetId);
     }
 
     private void update(Context context, AppWidgetManager manager, int widgetId) {
@@ -94,7 +112,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 prefs.getInt("fontSize", 16));
         boolean animated = applyImage(context, widgetId, views, quote, background);
         if (custom) {
-            applyCustomLayout(context, manager, widgetId, views, prefs);
+            applyCustomLayout(context, manager, widgetId, views, prefs, quote, meta);
         }
 
         views.setTextColor(R.id.quote_text, night ? 0xfff4eff7 : 0xff24212a);
@@ -106,9 +124,9 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 context, widgetId, next,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_root, click);
-        // 图片区域也要能换一句，否则点到图上是死的
+        // 静态图也挂上点击；AdapterViewFlipper 绝对不能 setOnClickListener，
+        // AdapterView 会直接抛 "Don't call setOnClickListener for an AdapterView"
         views.setOnClickPendingIntent(R.id.quote_image, click);
-        views.setOnClickPendingIntent(R.id.quote_image_flipper, click);
 
         manager.updateAppWidget(widgetId, views);
         if (animated) {
@@ -166,23 +184,32 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
 
     /**
      * 自定义布局：文字块与图片块按 0–1 的分数定位。
-     * RemoteViews 改不了 margin，所以用「包装容器 + padding」把 match_parent 的子视图
-     * 挤到目标位置——padding 会把子视图的可用区域缩小到目标矩形。
+     * RemoteViews 改不了 margin，所以用「包装容器 + padding」把固定尺寸的子视图推到目标位置。
+     *
+     * 尺寸取 OPTION_APPWIDGET_SIZES（真实尺寸），再扣掉 launcher 给 widget 宿主的 inset；
+     * 文字块的纵向位置还要用实际排版高度收敛，否则长句会顶到卡片外面被裁掉。
      */
     private void applyCustomLayout(Context context, AppWidgetManager manager, int widgetId,
-                                   RemoteViews views, SharedPreferences prefs) {
+                                   RemoteViews views, SharedPreferences prefs,
+                                   Quote quote, String meta) {
         float density = context.getResources().getDisplayMetrics().density;
-        Bundle options = manager.getAppWidgetOptions(widgetId);
-        int widthDp = Math.max(120, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180));
-        int heightDp = Math.max(80, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110));
+        int[] sizeDp = widgetSizeDp(manager, widgetId);
+        int widthDp = sizeDp[0];
+        int heightDp = sizeDp[1];
+
         int inset = Math.round(14 * density);
-        int contentWidth = Math.max(1, Math.round(widthDp * density) - inset * 2);
-        int contentHeight = Math.max(1, Math.round(heightDp * density) - inset * 2);
+        // 宿主（launcher）会在 widget 四周再留一点内边距，从上报尺寸里扣掉，避免按最大尺寸排版
+        int hostInset = Math.round(HOST_INSET_DP * density);
+        int contentWidth = Math.max(1, Math.round(widthDp * density) - inset * 2 - hostInset);
+        int contentHeight = Math.max(1, Math.round(heightDp * density) - inset * 2 - hostInset);
 
         int textLeft = clampPx(prefs.getFloat("textX", 0.06f) * contentWidth,
-                0, contentWidth - Math.round(60 * density));
+                0, Math.max(0, contentWidth - Math.round(60 * density)));
+        int availableWidth = Math.max(Math.round(40 * density), contentWidth - textLeft);
+        int textBlockHeight = measureTextBlock(context, quote.text, meta,
+                availableWidth, prefs.getInt("fontSize", 16));
         int textTop = clampPx(prefs.getFloat("textY", 0.06f) * contentHeight,
-                0, contentHeight - Math.round(32 * density));
+                0, Math.max(0, contentHeight - textBlockHeight));
         views.setViewPadding(R.id.text_wrap, textLeft, textTop, 0, 0);
         views.setViewVisibility(R.id.text_box,
                 prefs.getBoolean("textBox", false) ? View.VISIBLE : View.GONE);
@@ -192,8 +219,46 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         int maxImageY = Math.max(0, contentHeight - imageSize);
         int imageLeft = clampPx(prefs.getFloat("imageX", 0.58f) * contentWidth, 0, maxImageX);
         int imageTop = clampPx(prefs.getFloat("imageY", 0.18f) * contentHeight, 0, maxImageY);
-        views.setViewPadding(R.id.image_wrap, imageLeft, imageTop,
-                Math.max(0, maxImageX - imageLeft), Math.max(0, maxImageY - imageTop));
+        // 子视图尺寸固定为 78dp，这里只需要给出左上角偏移
+        views.setViewPadding(R.id.image_wrap, imageLeft, imageTop, 0, 0);
+    }
+
+    /** 用和布局相同的字号/宽度估算文字块高度，供纵向收敛使用。 */
+    private int measureTextBlock(Context context, String text, String meta, int width, int fontSizeSp) {
+        float scaled = context.getResources().getDisplayMetrics().scaledDensity;
+        TextPaint quotePaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+        quotePaint.setTextSize(fontSizeSp * scaled);
+        StaticLayout body = StaticLayout.Builder.obtain(text, 0, text.length(), quotePaint, width)
+                .setMaxLines(8)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .build();
+
+        TextPaint metaPaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+        metaPaint.setTextSize(11 * scaled);
+        StaticLayout metaLayout = StaticLayout.Builder.obtain(meta, 0, meta.length(), metaPaint, width)
+                .setMaxLines(3)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .build();
+
+        return body.getHeight() + metaLayout.getHeight()
+                + Math.round(6 * context.getResources().getDisplayMetrics().density);
+    }
+
+    /** 优先用 API 31+ 的 OPTION_APPWIDGET_SIZES（真实尺寸），否则退回 min 尺寸。 */
+    private int[] widgetSizeDp(AppWidgetManager manager, int widgetId) {
+        Bundle options = manager.getAppWidgetOptions(widgetId);
+        int width = Math.max(120, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180));
+        int height = Math.max(80, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ArrayList<SizeF> sizes = options.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES);
+            if (sizes != null && !sizes.isEmpty()) {
+                SizeF first = sizes.get(0);
+                width = Math.max(120, Math.round(first.getWidth()));
+                height = Math.max(80, Math.round(first.getHeight()));
+            }
+        }
+        Log.i(TAG, "widget " + widgetId + " 尺寸=" + width + "x" + height + "dp options=" + options);
+        return new int[]{width, height};
     }
 
     private int clampPx(float value, int min, int max) {

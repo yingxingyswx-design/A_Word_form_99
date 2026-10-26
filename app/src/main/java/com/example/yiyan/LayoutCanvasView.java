@@ -126,8 +126,20 @@ public class LayoutCanvasView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        widgetRect.set(getPaddingLeft(), getPaddingTop(),
-                getWidth() - getPaddingRight(), getHeight() - getPaddingBottom());
+        // 画布面积不受限，但小组件有固定宽高比，预览框按 180:110 居中，拖出来的比例才和桌面一致
+        float availableWidth = getWidth() - getPaddingLeft() - getPaddingRight();
+        float availableHeight = getHeight() - getPaddingTop() - getPaddingBottom();
+        float aspect = 180f / 110f;
+        float width = availableWidth;
+        float height = width / aspect;
+        if (height > availableHeight) {
+            height = availableHeight;
+            width = height * aspect;
+        }
+        float left = getPaddingLeft() + (availableWidth - width) / 2f;
+        float top = getPaddingTop() + (availableHeight - height) / 2f;
+        widgetRect.set(left, top, left + width, top + height);
+
         float radius = dp(18);
         canvas.drawRoundRect(widgetRect, radius, radius, backgroundPaint);
 
