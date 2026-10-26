@@ -21,7 +21,8 @@ import java.util.Set;
  */
 final class QuoteImporter {
 
-    private static final int MAX_ENTRIES = 5000;
+    /** 全量语料（hitokoto 约 1.1 万条）要能一次导入，上限放宽到 20000。 */
+    private static final int MAX_ENTRIES = 20000;
 
     static final class Result {
         int imported;
