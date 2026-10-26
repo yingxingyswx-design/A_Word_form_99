@@ -423,27 +423,10 @@
                         </com.google.android.material.button.MaterialButtonToggleGroup>
 
                         <TextView
-                            android:id="@+id/wallpaper_status"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:text="真实壁纸：未授权"
-                            android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorPrimary" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/wallpaper_grant"
-                            style="@style/Widget.Yiyan.Button.Tonal"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="允许读取壁纸（所有文件访问）" />
-
-                        <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="小组件本身是透明的：桌面壁纸就是玻璃的背景，实时对齐、不需要权限。Android 小组件不能对桌面做真模糊，所以「雾面程度」只是给玻璃加一层极淡的漫射。下面这项权限只影响 App 内预览能不能垫上真实壁纸。"
+                            android:text="小组件是透明底：桌面壁纸实时从玻璃下面透出来，不读壁纸、不截屏。边框、顶部反光条、内发光、磨砂这些光学层每次刷新实时重算；预览里的底色只是示意。"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>

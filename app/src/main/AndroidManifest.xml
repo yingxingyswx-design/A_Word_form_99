@@ -1,11 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- 读取真实壁纸：Android 14 起只有「所有文件访问」权限才能拿到壁纸像素，
-         用于液态玻璃的实时模糊背景；不授权时退回壁纸取色，不影响其他功能。 -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
 
     <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/></intent></queries>
     <application android:name=".DailyApp" android:theme="@style/AppTheme" android:label="@string/app_name" android:icon="@mipmap/ic_launcher_v2" android:roundIcon="@mipmap/ic_launcher_round_v2" android:resizeableActivity="true">

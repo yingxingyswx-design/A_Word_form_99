@@ -26,7 +26,6 @@ import java.util.Set;
 public class SettingsActivity extends AppCompatActivity {
 
     private static final int REQUEST_IMPORT_XML = 4401;
-    private static final int REQUEST_WALLPAPER = 4501;
     private static final String KEY_UPDATE_CHANNEL = "updateChannel";
 
 
@@ -58,7 +57,6 @@ public class SettingsActivity extends AppCompatActivity {
         bindMonet();
         bindThemeColor();
         bindGlass();
-        bindWallpaperAccess();
         bindAddQuote();
         bindCustomLayout();
         bindImport();
@@ -151,66 +149,7 @@ public class SettingsActivity extends AppCompatActivity {
     private void previewSpec() {
         GlassPreviewView preview = findViewById(R.id.glass_preview);
         GlassRenderer.Spec spec = GlassRenderer.spec(this, prefs);
-        int[] colors = GlassRenderer.wallpaperColors(this);
-        spec.tint = colors[0];
-        spec.tint2 = colors[1];
-        spec.tint3 = colors[2];
         preview.setSpec(spec, GlassRenderer.enabled(prefs));
-        preview.setWallpaper(WallpaperSource.load(this, 720));
-    }
-
-    /** 读真实壁纸需要「所有文件访问」（Android 11+）或存储权限（更早版本）。 */
-    private void bindWallpaperAccess() {
-        refreshWallpaperStatus();
-        findViewById(R.id.wallpaper_grant).setOnClickListener(v -> requestWallpaperAccess());
-    }
-
-    private void refreshWallpaperStatus() {
-        TextView status = findViewById(R.id.wallpaper_status);
-        if (WallpaperSource.canRead(this)) {
-            status.setText("真实壁纸：已授权，玻璃实时使用壁纸做模糊");
-        } else if (android.os.Build.VERSION.SDK_INT >= 30) {
-            status.setText("真实壁纸：未授权（需要「所有文件访问」）");
-        } else {
-            status.setText("真实壁纸：未授权（需要存储权限）");
-        }
-    }
-
-    private void requestWallpaperAccess() {
-        if (WallpaperSource.canRead(this)) {
-            Toast.makeText(this, "已授权，玻璃会实时使用壁纸", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            try {
-                startActivity(new Intent(
-                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                        android.net.Uri.parse("package:" + getPackageName())));
-            } catch (Exception e) {
-                startActivity(new Intent(
-                        android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
-            }
-        } else {
-            requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},
-                    REQUEST_WALLPAPER);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQUEST_WALLPAPER) return;
-        refreshWallpaperStatus();
-        previewSpec();
-        scheduleWidgetRefresh();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (prefs == null) return;
-        refreshWallpaperStatus();
-        previewSpec();
     }
 
     private void scheduleWidgetRefresh() {

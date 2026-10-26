@@ -162,8 +162,7 @@ public class LayoutCanvasView extends View {
         if (glassBitmap == null || glassWidth != w || glassHeight != h
                 || !signature.equals(glassSignature)) {
             if (glassBitmap != null) glassBitmap.recycle();
-            glassBitmap = GlassRenderer.render(getContext(), w, h, spec,
-                    WallpaperSource.load(getContext(), 720));
+            glassBitmap = GlassRenderer.render(getContext(), w, h, spec);
             glassWidth = w;
             glassHeight = h;
             glassSignature = signature;

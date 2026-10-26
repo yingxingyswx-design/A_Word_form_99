@@ -170,22 +170,14 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 ? GlassRenderer.spec(context, prefs) : null;
         int frameBackground = background;
         if (glassSpec != null) {
-            // 壁纸三色用来还原「被模糊掉的背景」；光源方位按句子散列轻微变化
-            int[] wallpaperColors = GlassRenderer.wallpaperColors(context);
-            glassSpec.tint = wallpaperColors[0];
-            glassSpec.tint2 = wallpaperColors[1];
-            glassSpec.tint3 = wallpaperColors[2];
-            glassSpec.light = (Math.abs(quote.text.hashCode()) % 1000) / 1000f;
             Log.i(TAG, "玻璃材质=" + glassSpec.material + " " + sizeDp[0] + "x" + sizeDp[1] + "dp tone="
                     + (glassSpec.dark ? "dark" : "light")
                     + " blur=" + Math.round(glassSpec.blur * 100)
                     + " density=" + Math.round(glassSpec.density * 100));
-            // 毛玻璃需要真实壁纸做模糊底；拿不到时 renderer 会用壁纸取色兜底
-            Bitmap wallpaper = glassSpec.isFrost()
-                    ? WallpaperSource.load(context, 720) : null;
+            // 透明底：壁纸由桌面实时透出来，玻璃只画自己的光学层
             Bitmap glassBitmap = GlassRenderer.render(context,
                     Math.round(sizeDp[0] * density), Math.round(sizeDp[1] * density),
-                    glassSpec, wallpaper);
+                    glassSpec);
             views.setImageViewBitmap(R.id.glass_bg, glassBitmap);
             views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
             frameBackground = GlassRenderer.solidFill(glassSpec);

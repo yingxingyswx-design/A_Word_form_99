@@ -14,8 +14,8 @@ import android.util.AttributeSet;
 import android.view.View;
 
 /**
- * 「个性」页里的液态玻璃实时预览：底下铺一层假壁纸，上面盖 GlassRenderer 渲染的玻璃层，
- * 参数一动就重画，省得每次都要回桌面看效果。
+ * 「个性」页的玻璃实时预览。玻璃本身是透明底（桌面上壁纸是实时透出来的），
+ * 这里在下面垫一块示意底，用来观察反光条、边框、内发光和磨砂的效果。
  */
 public class GlassPreviewView extends View {
 
@@ -28,7 +28,6 @@ public class GlassPreviewView extends View {
     private GlassRenderer.Spec spec = new GlassRenderer.Spec();
     private boolean enabled;
     private Bitmap glass;
-    private Bitmap wallpaper;
     private int glassWidth;
     private int glassHeight;
     private boolean dirty = true;
@@ -71,8 +70,8 @@ public class GlassPreviewView extends View {
             ensureGlass((int) w, (int) h);
             if (glass != null) canvas.drawBitmap(glass, null, rect, paint);
         } else {
-            float radius = GlassRenderer.cornerPx(getContext(), spec, getResources()
-                    .getDisplayMetrics().density);
+            float radius = GlassRenderer.cornerPx(getContext(), spec,
+                    getResources().getDisplayMetrics().density);
             Paint card = new Paint(Paint.ANTI_ALIAS_FLAG);
             card.setColor(0xFFFDF8F3);
             canvas.drawRoundRect(rect, radius, radius, card);
@@ -84,47 +83,35 @@ public class GlassPreviewView extends View {
 
         float pad = 16 * getResources().getDisplayMetrics().density;
         boolean dark = spec.dark;
-        textPaint.setColor(dark ? 0xFFF7F4FF : 0xFF1B1A20);
-        metaPaint.setColor(dark ? 0xFFD7C8FF : 0xFF4F378B);
+        textPaint.setColor(dark ? 0xFFFDFCFF : 0xFF121016);
+        metaPaint.setColor(dark ? 0xFFEDE6FF : 0xFF3B3350);
         canvas.drawText("知者不惑。", pad, pad + textPaint.getTextSize(), textPaint);
-        canvas.drawText("— 孔子 · 《论语》 · 液态玻璃", pad,
+        canvas.drawText("— 孔子 · 《论语》 · 玻璃预览", pad,
                 pad + textPaint.getTextSize() + metaPaint.getTextSize() * 2.1f, metaPaint);
     }
 
+    /** 示意底：桌面上这块位置是实时壁纸，这里用主题色铺一个柔和渐变来观察光学层。 */
     private void drawBackdrop(Canvas canvas, float w, float h) {
-        if (wallpaper != null && !wallpaper.isRecycled()) {
-            // 用真实壁纸做底：居中裁剪，和桌面上的观感一致
-            float scale = Math.max(w / wallpaper.getWidth(), h / wallpaper.getHeight());
-            float dw = wallpaper.getWidth() * scale;
-            float dh = wallpaper.getHeight() * scale;
-            RectF dst = new RectF((w - dw) / 2f, (h - dh) / 2f, (w + dw) / 2f, (h + dh) / 2f);
-            canvas.drawBitmap(wallpaper, null, dst, backdropPaint);
-            return;
-        }
-        // 读不到壁纸时，用壁纸取色搭一个同色系的底，不写死颜色
-        backdropPaint.setShader(new LinearGradient(0, 0, w, h,
-                spec.tint2, spec.tint3, Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, w, h, backdropPaint);
-        backdropPaint.setShader(new RadialGradient(w * 0.18f, h * 0.85f, Math.max(w, h) * 0.55f,
-                spec.tint, Color.TRANSPARENT, Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, w, h, backdropPaint);
-        backdropPaint.setShader(new RadialGradient(w * 0.9f, h * 0.1f, Math.max(w, h) * 0.6f,
-                spec.tint2, Color.TRANSPARENT, Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, w, h, backdropPaint);
-    }
+        int primary = getResources().getColor(R.color.md_primary, getContext().getTheme());
+        int secondary = getResources().getColor(R.color.md_secondary, getContext().getTheme());
 
-    /** 设置真实壁纸（可能为 null：系统不允许读）。 */
-    public void setWallpaper(Bitmap bitmap) {
-        if (bitmap == wallpaper) return;
-        wallpaper = bitmap;
-        dirty = true;
-        invalidate();
+        backdropPaint.setShader(new LinearGradient(0, 0, w, h,
+                primary, secondary, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, w, h, backdropPaint);
+
+        backdropPaint.setShader(new RadialGradient(w * 0.15f, h * 0.9f, Math.max(w, h) * 0.6f,
+                Color.argb(150, 255, 255, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, w, h, backdropPaint);
+
+        backdropPaint.setShader(new RadialGradient(w * 0.9f, h * 0.1f, Math.max(w, h) * 0.65f,
+                Color.argb(110, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, w, h, backdropPaint);
     }
 
     private void ensureGlass(int w, int h) {
         if (!dirty && glass != null && glassWidth == w && glassHeight == h) return;
         Bitmap previous = glass;
-        glass = GlassRenderer.render(getContext(), w, h, spec, wallpaper);
+        glass = GlassRenderer.render(getContext(), w, h, spec);
         glassWidth = w;
         glassHeight = h;
         dirty = false;
