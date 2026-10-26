@@ -185,21 +185,25 @@ public final class GlassRenderer {
     // ---- 极淡的环境色：玻璃会捡一点周围的颜色 ----
 
     private static void drawTint(Canvas canvas, RectF rect, int w, int h, Spec spec) {
-        float tintAlpha = 0.05f + spec.density * 0.13f;
-        Paint tint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        tint.setShader(new LinearGradient(0, 0, w, h,
-                withAlpha(spec.tint, tintAlpha), withAlpha(spec.tint2, tintAlpha * 0.55f),
-                Shader.TileMode.CLAMP));
-        canvas.drawRect(rect, tint);
+        // 底色：白/黑里掺一点壁纸主色 —— 这就是 Apple `.clear` 里那层「压亮度」的染色，
+        // 让文字在花哨壁纸上也能读，同时不破坏壁纸本身（没有假的模糊块，天然对齐）
+        int toneColor = spec.dark ? 0xFF0B0912 : 0xFFFFFFFF;
+        int scrimColor = blend(toneColor, spec.tint, spec.dark ? 0.30f : 0.26f);
+        float scrimAlpha = (spec.dark ? 0.16f : 0.20f) + spec.blur * 0.26f
+                + spec.density * 0.14f;
 
-        // 明度微调：浅色玻璃略提亮、深色略压暗，让文字有对比度，但不至于变成乳白
-        int veil = spec.dark ? 0xFF05040A : 0xFFFFFFFF;
-        float veilAlpha = (spec.dark ? 0.10f : 0.06f) + spec.blur * (spec.dark ? 0.16f : 0.12f);
-        Paint wash = new Paint(Paint.ANTI_ALIAS_FLAG);
-        wash.setShader(new LinearGradient(0, 0, 0, h,
-                withAlpha(veil, veilAlpha * 0.8f), withAlpha(veil, veilAlpha),
-                Shader.TileMode.CLAMP));
-        canvas.drawRect(rect, wash);
+        Paint scrim = new Paint(Paint.ANTI_ALIAS_FLAG);
+        scrim.setShader(new LinearGradient(0, 0, w * 0.4f, h,
+                withAlpha(scrimColor, scrimAlpha * 0.85f),
+                withAlpha(scrimColor, scrimAlpha), Shader.TileMode.CLAMP));
+        canvas.drawRect(rect, scrim);
+
+        // 一点点环境色流动，让玻璃不是死板的纯色板
+        Paint tint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        tint.setShader(new RadialGradient(w * (0.15f + 0.2f * spec.light), h * 0.1f,
+                Math.max(w, h) * 0.7f, withAlpha(spec.tint2, 0.10f + spec.density * 0.10f),
+                withAlpha(spec.tint2, 0f), Shader.TileMode.CLAMP));
+        canvas.drawRect(rect, tint);
     }
 
     // ---- 厚度：顶边内阴影 + 底边回光 ----
@@ -359,6 +363,15 @@ public final class GlassRenderer {
     private static int withAlpha(int color, float alpha) {
         int a = Math.round(Math.max(0f, Math.min(1f, alpha)) * 255f);
         return Color.argb(a, Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    /** 把 tint 按比例混进 color，让白/黑染层带上壁纸的环境色。 */
+    private static int blend(int color, int tint, float ratio) {
+        float r = Math.max(0f, Math.min(1f, ratio));
+        int red = Math.round(Color.red(color) * (1 - r) + Color.red(tint) * r);
+        int green = Math.round(Color.green(color) * (1 - r) + Color.green(tint) * r);
+        int blue = Math.round(Color.blue(color) * (1 - r) + Color.blue(tint) * r);
+        return Color.rgb(red, green, blue);
     }
 
     private static float clamp01(float value) {
