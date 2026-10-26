@@ -17,7 +17,7 @@ import android.widget.Toast;
  * 图片支持多个（上限 4 个）、删除、水平/垂直镜像。
  * 小组件尺寸用「宽 +/− / 高 +/−」调整，编辑器会把画布按同样的宽高比显示。
  */
-public class LayoutEditorActivity extends AppCompatActivity {
+public class LayoutEditorActivity extends ThemedActivity {
 
     private static final int REQUEST_PICK_IMAGE = 4301;
     private static final int MAX_IMAGES = 4;

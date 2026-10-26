@@ -38,7 +38,7 @@ import java.util.Locale;
  * 作者、出处、配图都是可选的，编辑时只有句子必填。
  * 配图通过系统文件选择器（SAF）选中后立刻复制到私有目录，支持 GIF。
  */
-public class ManageQuotesActivity extends AppCompatActivity {
+public class ManageQuotesActivity extends ThemedActivity {
 
     private static final String ALL = "全部";
     private static final String DEFAULT_CATEGORY = "用户";

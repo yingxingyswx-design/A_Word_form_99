@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2×2 / 矮宽小组件的紧凑排版。
+  各厂商桌面（HyperOS、HarmonyOS、ColorOS、OriginOS 等）默认把组件锁在 2×2，
+  实际内容区只有 110–170dp 宽；原来固定 78dp 的配图会把文字挤到只剩两三个字一行。
+  紧凑版因此不显示配图，文字占满整个宽度，只保留一行作者信息，提示语默认隐藏。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background">
+
+    <ImageView
+        android:id="@+id/glass_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/quote_text"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:text="知者不惑，仁者不忧，勇者不惧。"
+            android:textColor="@color/ink"
+            android:textSize="14sp"
+            android:shadowColor="#26000000"
+            android:shadowRadius="4"
+            android:shadowDx="0"
+            android:shadowDy="1.5"
+            android:gravity="center_vertical"
+            android:maxLines="6"
+            android:ellipsize="end"
+            android:lineSpacingExtra="2dp"
+            android:breakStrategy="high_quality"
+            android:hyphenationFrequency="none" />
+
+        <TextView
+            android:id="@+id/quote_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="— 孔子 · 《论语》"
+            android:textColor="@color/accent"
+            android:textSize="9sp"
+            android:shadowColor="#22000000"
+            android:shadowRadius="4"
+            android:shadowDx="0"
+            android:shadowDy="1.5"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/next_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="点按换一句"
+            android:textColor="#776F80"
+            android:textSize="8sp"
+            android:gravity="right"
+            android:visibility="gone" />
+    </LinearLayout>
+</FrameLayout>

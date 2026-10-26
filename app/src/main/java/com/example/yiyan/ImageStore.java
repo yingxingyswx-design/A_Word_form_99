@@ -41,7 +41,7 @@ final class ImageStore {
     /** 小组件单次 RemoteViews 有 Binder 体积限制，解码后的位图必须压到这个尺寸以内。 */
     static final int WIDGET_MAX_PX = 240;
     /**
-     * 帧文件按最长边存这个尺寸。小组件右侧图片按 78dp 显示，3x 屏也才 234px，
+     * 帧文件按最长边存这个尺寸。小组件右侧图片按 72dp 显示，3x 屏也才 216px，
      * 但每次翻页都要把位图跨 Binder 送一次，所以取 160px —— 肉眼几乎看不出差别，
      * 单帧体积却从 230KB 降到约 100KB。
      */

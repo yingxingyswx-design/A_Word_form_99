@@ -1,7 +1,6 @@
 <resources>
     <color name="ink">#E7E1EA</color>
     <color name="paper">#16141A</color>
-    <color name="accent">#D0BCFF</color>
     <color name="icon_background">#17151C</color>
     <color name="icon_foreground_tint">#D0BCFF</color>
     <color name="icon_top">#4F378B</color>
@@ -9,14 +8,12 @@
     <color name="icon_divider">#3A3440</color>
     <color name="icon_highlight">#332D41</color>
 
-    <color name="md_primary">#D0BCFF</color>
-    <color name="md_on_primary">#381E72</color>
-    <color name="md_primary_container">#4F378B</color>
-    <color name="md_on_primary_container">#EADDFF</color>
-    <color name="md_secondary">#CCC2DC</color>
-    <color name="md_on_secondary">#332D41</color>
-    <color name="md_secondary_container">#4A4458</color>
-    <color name="md_on_secondary_container">#E8DEF8</color>
+    <!--
+      md_primary / accent 等强调色故意不提供 night 变体：
+      ColorResourcesOverride 的 ResourcesLoader 只写入默认 config，
+      如果这里再定义 values-night，深色模式下 night 值会压过用户主题色。
+      运行时由 ThemeColors 用 Scheme.dark(seed) 注入深色强调色。
+    -->
     <color name="md_surface">#16141A</color>
     <color name="md_surface_container">#221F26</color>
     <color name="md_surface_container_high">#2B2730</color>

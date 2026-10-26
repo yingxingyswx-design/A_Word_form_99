@@ -80,7 +80,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 在线随机一言要联网，不能在主线程做；用 goAsync 把广播生命周期延长到更新完成。
+     * 玻璃位图 / 图片解码可能在后台做，仍用 goAsync 把广播生命周期延长到更新完成。
      */
     private void updateAsync(Context context, int[] ids) {
         final BroadcastReceiver.PendingResult pending = goAsync();
@@ -133,31 +133,13 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         SharedPreferences prefs = context.getSharedPreferences("settings", 0);
         sendGlassConfig(context, prefs);
         List<Quote> candidates = candidates(context, prefs);
-
-        boolean onlineRandom = prefs.getBoolean("onlineRandom", false);
-        Quote quote = null;
-        int index = -1;
-
-        if (onlineRandom) {
-            // 「随机」是 App 自带的在线分类：取 Hitokoto，失败退缓存，再失败回本地语料
-            try {
-                quote = HitokotoClient.fetch();
-                HitokotoClient.cache(prefs, quote);
-                Log.i(TAG, "在线随机一言：" + quote.text);
-            } catch (Exception e) {
-                Log.w(TAG, "在线一言失败，用缓存：" + e.getMessage());
-                quote = HitokotoClient.cached(prefs);
-            }
-        }
-
-        if (quote == null) {
-            if (candidates.isEmpty()) return;
-            boolean random = prefs.getBoolean("randomMode", true);
-            index = random
-                    ? new Random().nextInt(candidates.size())
-                    : (prefs.getInt("quoteIndex", -1) + 1) % candidates.size();
-            quote = candidates.get(index);
-        }
+        if (candidates.isEmpty()) return;
+        // 随机一言 / Hitokoto 全部使用 App 内置的 assets 语料，不再联网取词。
+        boolean random = prefs.getBoolean("randomMode", true);
+        int index = random
+                ? new Random().nextInt(candidates.size())
+                : (prefs.getInt("quoteIndex", -1) + 1) % candidates.size();
+        Quote quote = candidates.get(index);
 
         String meta = meta(quote);
 
@@ -176,58 +158,68 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
 
         boolean night = (context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        int accent = prefs.getInt("themeColor", 0xff6750a4);
-        if (prefs.getBoolean("monet", false) && android.os.Build.VERSION.SDK_INT >= 31) {
-            accent = context.getColor(android.R.color.system_accent1_600);
-        }
-        if (night) accent = 0xffd0bcff;
+        // 主题色统一交给 ThemeColors：Monet 优先，深色模式只提高过暗颜色的明度，
+        // 不再把用户选的颜色直接覆盖成固定紫色。
+        int accent = ThemeColors.forWidget(context, prefs);
         int background = night ? 0xff211f24 : prefs.getInt("backgroundColor", 0xfffff9f0);
 
+        float density = context.getResources().getDisplayMetrics().density;
+        int[] sizeDp = widgetSizeDp(context, manager, widgetId);
+        // 各厂商桌面默认把组件锁成 2×2，可用内容区通常只有 110–170dp。
+        // 这个尺寸下继续用「固定配图 + 三行作者信息」会把文字挤成两三字一列，
+        // 所以按实际尺寸切换紧凑版：不显示配图、文字占满宽度、字号与内边距一起缩。
+        boolean compact = isCompact(sizeDp);
         boolean custom = prefs.getBoolean("customLayout", false);
+        boolean showMeta = !compact || (sizeDp[0] >= 96 && sizeDp[1] >= 96);
+        boolean showHint = !compact && sizeDp[1] >= 150;
+        int userFontSp = clampFontSp(prefs.getInt("fontSize", 16));
+        int fontSp = custom ? userFontSp : widgetFontSize(context, sizeDp, userFontSp,
+                quote.hasImage(), compact, showMeta, showHint);
+
         RemoteViews views = new RemoteViews(context.getPackageName(),
-                custom ? R.layout.widget_quote_custom : R.layout.widget_quote);
+                custom ? R.layout.widget_quote_custom
+                        : (compact ? R.layout.widget_quote_compact : R.layout.widget_quote));
         views.setTextViewText(R.id.quote_text, quote.text);
-        views.setTextViewText(R.id.quote_meta, meta);
-        views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP,
-                prefs.getInt("fontSize", 16));
+        // 2×2 上完整元信息（作者 · 作品 · 类型 · 分类）一行放不下，只保留作者与作品，
+        // 避免出现 “— 刘慈欣 · 《三体I：地球往事》 · Hito…” 这种被截断的尾巴。
+        views.setTextViewText(R.id.quote_meta, compact ? metaCompact(quote) : meta);
+        views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP, fontSp);
+        views.setViewVisibility(R.id.quote_meta, showMeta ? View.VISIBLE : View.GONE);
+        views.setViewVisibility(R.id.next_hint, showHint ? View.VISIBLE : View.GONE);
+        if (!custom) {
+            int padPx = Math.round(contentPaddingDp(sizeDp, compact) * density);
+            views.setViewPadding(R.id.widget_content, padPx, padPx, padPx, padPx);
+        }
 
         // 液态玻璃：根背景转透明，让壁纸从玻璃层下面透出来；玻璃位图按小组件实际尺寸现渲染
-        float density = context.getResources().getDisplayMetrics().density;
-        int[] sizeDp = widgetSizeDp(manager, widgetId);
-        boolean hasCustomBg = CustomBackground.enabled(prefs);
-        Bitmap customBg = null;
-        if (hasCustomBg) {
-            try {
-                customBg = CustomBackground.load(context, prefs);
-                Log.i(TAG, "自定义背景加载：" + (customBg == null ? "失败" : customBg.getWidth() + "x" + customBg.getHeight()));
-            } catch (Throwable t) {
-                Log.w(TAG, "自定义背景加载异常", t);
-            }
-        }
+        boolean hasCustomBg = CustomBackground.enabled(prefs) && CustomBackground.hasContent(prefs);
+        boolean colorBg = hasCustomBg && CustomBackground.isColorStyle(prefs);
         // 互斥：启用自定义背景时不再走玻璃；启用玻璃时忽略自定义背景
-        GlassRenderer.Spec glassSpec = (customBg == null && GlassRenderer.enabled(prefs))
+        GlassRenderer.Spec glassSpec = (!hasCustomBg && GlassRenderer.enabled(prefs))
                 ? GlassRenderer.spec(context, prefs) : null;
-        int frameBackground = background;
-        if (customBg != null) {
+        int frameBackground = colorBg ? CustomBackground.averageColor(prefs) : background;
+        if (hasCustomBg) {
             int cardW = Math.round(sizeDp[0] * density);
             int cardH = Math.round(sizeDp[1] * density);
             Bitmap card = null;
             try {
-                card = CustomBackground.renderCard(context, cardW, cardH, customBg,
-                        CustomBackground.blurred(prefs), CustomBackground.blurAmount(prefs),
+                card = CustomBackground.renderCard(context, cardW, cardH, prefs,
                         prefs.getInt(GlassRenderer.KEY_CORNER, GlassRenderer.DEFAULT_CORNER));
             } catch (Throwable t) {
                 Log.w(TAG, "自定义背景渲染失败", t);
             }
             if (card == null) {
                 views.setViewVisibility(R.id.glass_bg, View.GONE);
-                customBg = null;
+                hasCustomBg = false;
+                colorBg = false;
             } else {
-            views.setImageViewBitmap(R.id.glass_bg, card);
-            views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
-                Log.i(TAG, "背景=自定义卡片 " + cardW + "x" + cardH
-                        + (CustomBackground.blurred(prefs)
-                        ? " 高斯模糊 " + CustomBackground.blurAmount(prefs) + "%" : " 原图"));
+                views.setImageViewBitmap(R.id.glass_bg, card);
+                views.setViewVisibility(R.id.glass_bg, View.VISIBLE);
+                Log.i(TAG, "背景=自定义卡片 " + cardW + "x" + cardH + " "
+                        + CustomBackground.styleLabel(prefs)
+                        + (CustomBackground.isColorStyle(prefs) ? "" :
+                        CustomBackground.blurred(prefs)
+                                ? " 高斯模糊 " + CustomBackground.blurAmount(prefs) + "%" : " 原图"));
             }
         } else if (glassSpec != null) {
             Bitmap wallpaper = WallpaperSource.load(context, 800);
@@ -283,12 +275,22 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         boolean animated = false;
         if (custom) {
             animatedMask = applyCustomLayout(context, widgetId, views, prefs, frameBackground,
-                    quote, sizeDp);
-        } else {
+                    quote, sizeDp, compact);
+        } else if (!compact) {
+            // 2×2 紧凑版没有配图容器，图片让位给文字；放大后可恢复右侧配图
             animated = applyImage(context, widgetId, views, quote, frameBackground);
         }
 
-        if (glassSpec != null || customBg != null) {
+        if (colorBg) {
+            // 纯色/渐变的深浅与系统深色模式无关，直接按背景亮度选文字色；
+            // 作者行仍使用用户主题色，只按背景明度校正到可读。
+            boolean darkBg = CustomBackground.isDarkStyle(prefs);
+            views.setTextColor(R.id.quote_text, darkBg ? 0xFFFDFCFF : 0xFF121016);
+            views.setTextColor(R.id.quote_meta,
+                    ThemeColors.forBackground(context, prefs, darkBg));
+            views.setTextColor(R.id.next_hint, darkBg ? 0x99FDFCFF : 0x99413B50);
+            views.setInt(R.id.widget_root, "setBackgroundColor", Color.TRANSPARENT);
+        } else if (glassSpec != null || hasCustomBg) {
             boolean darkTone = glassSpec != null ? glassSpec.dark
                     : GlassRenderer.isDark(context, prefs);
             GlassRenderer.Spec toneSpec = glassSpec != null ? glassSpec
@@ -311,8 +313,9 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_root, click);
         // 静态图也挂上点击；AdapterViewFlipper 绝对不能 setOnClickListener，
-        // AdapterView 会直接抛 "Don't call setOnClickListener for an AdapterView"
-        if (!custom) {
+        // AdapterView 会直接抛 "Don't call setOnClickListener for an AdapterView"。
+        // 紧凑版没有 quote_image，不能对不存在的 id 设置点击，否则整份 RemoteViews 会应用失败。
+        if (!custom && !compact) {
             views.setOnClickPendingIntent(R.id.quote_image, click);
         }
 
@@ -385,7 +388,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
      */
     private int applyCustomLayout(Context context, int widgetId, RemoteViews views,
                                   SharedPreferences prefs, int frameBackground, Quote quote,
-                                  int[] sizeDp) {
+                                  int[] sizeDp, boolean compact) {
         CustomScene scene = CustomScene.load(prefs);
         float density = context.getResources().getDisplayMetrics().density;
 
@@ -409,10 +412,21 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         float textRotation = Math.round(CustomScene.normalizeRotation(scene.text.rotation) * 10f) / 10f;
         views.setFloat(R.id.text_box, "setRotation", textRotation);
         views.setFloat(R.id.text_content, "setRotation", textRotation);
+
+        // 2×2 下用户画的文字框可能只有 60–90dp 宽；先按框的实际像素缩字号，
+        // 再按可用高度截断，避免沿用 16sp 后一行只剩两三个字、作者行被挤到框外。
+        boolean showMeta = textHeight >= Math.round((compact ? 42 : 34) * density);
+        int metaReserve = showMeta ? Math.round((compact ? 18 : 30) * density) : 0;
+        int customFontSp = customFontSize(context, textWidth,
+                Math.max(1, textHeight - metaReserve), compact,
+                clampFontSp(prefs.getInt("fontSize", 16)));
+        views.setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP, customFontSp);
+        views.setTextViewTextSize(R.id.quote_meta, TypedValue.COMPLEX_UNIT_SP,
+                compact ? 9 : 10);
+        views.setViewVisibility(R.id.quote_meta, showMeta ? View.VISIBLE : View.GONE);
         // 框高固定时，先按可容纳的行数把句子截断，避免出现半行被硬裁的画面
         views.setTextViewText(R.id.quote_text, fitText(context, quote.text,
-                textWidth, Math.max(0, textHeight - Math.round(30 * density)),
-                prefs.getInt("fontSize", 16)));
+                textWidth, Math.max(1, textHeight - metaReserve), customFontSp));
 
         int animatedMask = 0;
         for (int i = 0; i < MAX_IMAGE_SLOTS; i++) {
@@ -479,37 +493,139 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
 
     /** 按框宽与可用高度把句子截到整数行，避免半行被裁。 */
     private String fitText(Context context, String text, int widthPx, int maxHeightPx, int fontSizeSp) {
-        if (text == null || widthPx <= 0 || maxHeightPx <= 0) return text;
+        if (text == null || text.isEmpty() || widthPx <= 0) return text;
         TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
         paint.setTextSize(fontSizeSp * context.getResources().getDisplayMetrics().scaledDensity);
         StaticLayout layout = StaticLayout.Builder.obtain(text, 0, text.length(), paint, widthPx)
-                .setMaxLines(8)
+                .setMaxLines(20)
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .build();
         if (layout.getLineCount() == 0) return text;
         int lineHeight = layout.getLineBottom(0) - layout.getLineTop(0);
         if (lineHeight <= 0) return text;
+        // 哪怕框只有一行高也至少放一行，再截断；返回原文会导致文字溢出框外。
         int maxLines = Math.max(1, maxHeightPx / lineHeight);
         if (layout.getLineCount() <= maxLines) return text;
         int end = layout.getLineEnd(Math.min(maxLines, layout.getLineCount()) - 1);
-        return text.substring(0, Math.max(0, end - 1)).trim() + "…";
+        int cut = Math.max(1, Math.min(text.length(), end));
+        return text.substring(0, cut).trim() + "…";
     }
 
-    /** 优先用 API 31+ 的 OPTION_APPWIDGET_SIZES（真实尺寸），否则退回 min 尺寸。 */
-    private int[] widgetSizeDp(AppWidgetManager manager, int widgetId) {
+    /**
+     * 2×2 锁定桌面下，组件可用宽度只有 110–170dp；固定配图会让正文只剩 20–40dp。
+     * 这里按尺寸给出紧凑版/常规版的分界，宽度或高度任一项偏小都走紧凑版。
+     */
+    private boolean isCompact(int[] sizeDp) {
+        return sizeDp[0] < 200 || sizeDp[1] < 150;
+    }
+
+    private int contentPaddingDp(int[] sizeDp, boolean compact) {
+        if (!compact) return 14;
+        int min = Math.min(sizeDp[0], sizeDp[1]);
+        if (min < 125) return 8;
+        if (min < 160) return 10;
+        return 12;
+    }
+
+    /**
+     * 按实际可用宽高推算字号，而不是直接把设置里的 16sp 塞进 2×2。
+     * 目标：每行约 8–9 个汉字、正文至少 4–5 行；同时尊重系统字体缩放（fontScale），
+     * 老用户把系统字号调大时不会把组件撑爆。
+     */
+    private int widgetFontSize(Context context, int[] sizeDp, int userSp, boolean hasImage,
+                               boolean compact, boolean showMeta, boolean showHint) {
+        float density = context.getResources().getDisplayMetrics().density;
+        float scaled = context.getResources().getDisplayMetrics().scaledDensity;
+        float fontScale = Math.max(1f, scaled / Math.max(1f, density));
+
+        int pad = contentPaddingDp(sizeDp, compact);
+        int imageReserve = (!compact && hasImage) ? 80 : 0;
+        int textWidthDp = Math.max(40, sizeDp[0] - pad * 2 - imageReserve);
+        int reserveDp = (showMeta ? (compact ? 16 : 36) : 0) + (showHint ? 14 : 0);
+        int textHeightDp = Math.max(24, sizeDp[1] - pad * 2 - reserveDp);
+        int targetLines = compact ? (sizeDp[0] >= 220 ? 4 : 5) : 4;
+
+        float byWidth = textWidthDp / (8.5f * fontScale);
+        float byHeight = textHeightDp / (targetLines * 1.4f * fontScale);
+        int cap = (int) Math.floor(Math.min(byWidth, byHeight));
+        int max = compact ? 15 : 28;
+        int min = compact ? 11 : 12;
+        int font = Math.min(userSp, Math.min(cap, max));
+        return Math.max(min, Math.min(28, font));
+    }
+
+    /** 自定义布局的文字框常常比默认版更窄，按框宽高单独缩字号。 */
+    private int customFontSize(Context context, int textWidthPx, int textHeightPx,
+                               boolean compact, int userSp) {
+        float scaled = context.getResources().getDisplayMetrics().scaledDensity;
+        // 每行至少放 6 个字，框高至少容纳 3 行；不满足时继续缩小。
+        float byWidth = textWidthPx / (6f * Math.max(1f, scaled));
+        float byHeight = Math.max(1, textHeightPx) / (3f * 1.4f * Math.max(1f, scaled));
+        int cap = (int) Math.floor(Math.min(byWidth, byHeight));
+        int max = compact ? 15 : 28;
+        int min = compact ? 10 : 12;
+        return Math.max(min, Math.min(max, Math.min(userSp, cap)));
+    }
+
+    private int clampFontSp(int value) {
+        return Math.max(12, Math.min(28, value));
+    }
+
+    /**
+     * 读取小组件当前尺寸。各 ROM 的 launcher 对 options 的填写差异很大：
+     *  - MIN/MAX 表示「可调整范围」，并不总是当前尺寸。Pixel 上 2×2 的
+     *    minHeight=108、maxHeight=210，但屏幕上实际是 179×210；
+     *  - API 31 的 SIZES 才带着成对的当前候选尺寸（179×210、419×109……）；
+     *  - 部分 ROM 只写 MIN，或小尺寸下直接给 0。
+     * 所以先用当前方向的宽度去 SIZES 里找同宽的那一对，再退回 MIN/MAX 与 2×2 安全值。
+     */
+    private int[] widgetSizeDp(Context context, AppWidgetManager manager, int widgetId) {
         Bundle options = manager.getAppWidgetOptions(widgetId);
-        int width = Math.max(120, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180));
-        int height = Math.max(80, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110));
+        boolean portrait = context.getResources().getConfiguration().orientation
+                != Configuration.ORIENTATION_LANDSCAPE;
+
+        int minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        int maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0);
+        int minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+        int maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        int width = firstPositive(portrait ? minW : maxW, portrait ? maxW : minW);
+        int height = firstPositive(portrait ? minH : maxH, portrait ? maxH : minH);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ArrayList<SizeF> sizes = options.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES);
+            ArrayList<SizeF> sizes = options.getParcelableArrayList(
+                    AppWidgetManager.OPTION_APPWIDGET_SIZES);
             if (sizes != null && !sizes.isEmpty()) {
-                SizeF first = sizes.get(0);
-                width = Math.max(120, Math.round(first.getWidth()));
-                height = Math.max(80, Math.round(first.getHeight()));
+                SizeF match = null;
+                if (width > 0) {
+                    for (SizeF size : sizes) {
+                        // 同一宽度可能出现多次（竖屏/横屏各一份），取第一份即可
+                        if (Math.abs(size.getWidth() - width) <= 6) {
+                            match = size;
+                            break;
+                        }
+                    }
+                }
+                if (match == null) match = sizes.get(0);
+                width = Math.round(match.getWidth());
+                height = Math.round(match.getHeight());
             }
         }
-        Log.i(TAG, "widget " + widgetId + " 尺寸=" + width + "x" + height + "dp options=" + options);
+        if (width <= 0) width = 160;
+        if (height <= 0) height = 150;
+        width = clampInt(width, 80, 1200);
+        height = clampInt(height, 60, 1200);
+
+        Log.i(TAG, "widget " + widgetId + " 尺寸=" + width + "x" + height + "dp compact="
+                + isCompact(new int[]{width, height}) + " options=" + options);
         return new int[]{width, height};
+    }
+
+    private int firstPositive(int first, int second) {
+        return first > 0 ? first : second;
+    }
+
+    private int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private int clampPx(float value, int min, int max) {
@@ -562,6 +678,21 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             }
         }
         return filtered;
+    }
+
+    /** 2×2 用的一行元信息：只留作者与作品，两者都没有时才退到类型/分类。 */
+    private String metaCompact(Quote quote) {
+        String author = zhAuthor(quote.author);
+        String work = zhWork(quote.work);
+        StringBuilder line = new StringBuilder();
+        if (!author.isEmpty()) line.append("— ").append(author);
+        if (!work.isEmpty()) {
+            if (line.length() > 0) line.append(" · ");
+            else line.append("— ");
+            line.append("《").append(work).append("》");
+        }
+        if (line.length() == 0) return quote.kind + " · " + quote.category;
+        return line.toString();
     }
 
     /** 元信息行：作者与出处在缺失时整段省略，不会出现 “—  · 《》”。 */

@@ -18,9 +18,10 @@
     <color name="md_on_secondary">#FFFFFF</color>
     <color name="md_secondary_container">#E9DEF8</color>
     <color name="md_on_secondary_container">#1F1735</color>
-    <color name="md_surface">#FDF8F3</color>
-    <color name="md_surface_container">#F3EBE2</color>
-    <color name="md_surface_container_high">#EDE3D8</color>
+    <!-- 浅色模式：纯白背景 + 中性浅灰卡片；不再使用米白 / 奶油色。 -->
+    <color name="md_surface">#FFFFFF</color>
+    <color name="md_surface_container">#F6F6F8</color>
+    <color name="md_surface_container_high">#EDEDF1</color>
     <color name="md_on_surface">#1C1B1F</color>
     <color name="md_on_surface_variant">#49454F</color>
     <color name="md_outline">#7A757F</color>

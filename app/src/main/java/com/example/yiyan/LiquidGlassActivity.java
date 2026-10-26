@@ -21,7 +21,7 @@ import com.google.android.material.button.MaterialButtonToggleGroup;
  * 所以自己画一个「会动的背景」当被折射的内容：壁纸缓慢推近 + 漂移高光。
  * 着色器采样的是同一份内容，所以玻璃边缘的折射、色散、亮边每帧都在变。
  */
-public class LiquidGlassActivity extends AppCompatActivity {
+public class LiquidGlassActivity extends ThemedActivity {
 
     private SharedPreferences prefs;
     private LiquidGlassBackdrop backdrop;

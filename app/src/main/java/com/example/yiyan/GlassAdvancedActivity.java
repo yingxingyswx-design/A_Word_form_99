@@ -15,7 +15,7 @@ import com.google.android.material.slider.Slider;
 import java.util.List;
 
 /** 玻璃材质 → 高级设置：对齐方式、无障碍定位、扩展注入。正式版会删掉这里的调试项。 */
-public class GlassAdvancedActivity extends AppCompatActivity {
+public class GlassAdvancedActivity extends ThemedActivity {
 
     private SharedPreferences prefs;
 

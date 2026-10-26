@@ -25,12 +25,17 @@ final class CustomScene {
     /** 场景数据版本。2 起旋转角度为任意值；旧版是 0/90/180/270 且已烘焙进位图。 */
     private static final int VERSION = 2;
 
-    /** 小组件基准尺寸（dp），编辑器的画布比例和小组件都按它换算。 */
-    int widthDp = 409;
-    int heightDp = 236;
+    /**
+     * 小组件基准尺寸（dp）。各厂商桌面默认把组件锁成 2×2，所以新布局按接近实际的
+     * 正方形画布预览；旧布局保留自己保存的宽高比，不会被强行改掉。
+     */
+    int widthDp = 180;
+    int heightDp = 180;
 
     boolean textBox;
-    final Box text = new Box(0.06f, 0.06f, 0.64f, 0.46f);
+    // 2×2 默认没有配图，文字框先占满大部分卡片；加图片后会按列表顺序叠在文字上，
+    // 用户仍可在编辑器里把文字框缩回原来的 64%×46%。
+    final Box text = new Box(0.06f, 0.06f, 0.88f, 0.80f);
 
     final List<ImageBox> images = new ArrayList<>();
 
@@ -136,15 +141,15 @@ final class CustomScene {
     static CustomScene fromJson(JSONObject root) throws JSONException {
         CustomScene scene = new CustomScene();
         int version = root.optInt("v", 1);
-        scene.widthDp = Math.max(120, root.optInt("w", 409));
-        scene.heightDp = Math.max(80, root.optInt("h", 236));
+        scene.widthDp = Math.max(120, root.optInt("w", 180));
+        scene.heightDp = Math.max(80, root.optInt("h", 180));
         scene.textBox = root.optBoolean("textBox", false);
         JSONObject text = root.optJSONObject("text");
         if (text != null) {
             scene.text.x = (float) text.optDouble("x", 0.06);
             scene.text.y = (float) text.optDouble("y", 0.06);
-            scene.text.w = (float) text.optDouble("w", 0.62);
-            scene.text.h = (float) text.optDouble("h", 0.36);
+            scene.text.w = (float) text.optDouble("w", 0.88);
+            scene.text.h = (float) text.optDouble("h", 0.80);
             scene.text.rotation = normalizeRotation((float) text.optDouble("r", 0));
         }
         JSONArray array = root.optJSONArray("images");

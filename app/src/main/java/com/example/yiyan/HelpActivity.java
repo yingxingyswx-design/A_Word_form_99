@@ -5,7 +5,7 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 
 /** 说明书：使用步骤 + XML 导入示例。 */
-public class HelpActivity extends AppCompatActivity {
+public class HelpActivity extends ThemedActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

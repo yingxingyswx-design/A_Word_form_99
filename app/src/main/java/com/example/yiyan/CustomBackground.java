@@ -4,9 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Shader;
 
 import java.io.File;
 
@@ -22,6 +24,43 @@ final class CustomBackground {
     static final String KEY_NAME = "customBgName";
     static final String KEY_BLUR = "customBgBlur";
     static final String KEY_BLUR_AMOUNT = "customBgBlurAmount";
+
+    static final String KEY_TYPE = "customBgType";
+    static final String TYPE_IMAGE = "image";
+    static final String TYPE_SOLID = "solid";
+    static final String TYPE_GRADIENT = "gradient";
+    static final String KEY_SOLID = "customBgSolid";
+    static final String KEY_GRADIENT_START = "customBgGradientStart";
+    static final String KEY_GRADIENT_END = "customBgGradientEnd";
+    static final String KEY_GRADIENT_NAME = "customBgGradientName";
+
+    /** 纯色色卡：浅色纸张系 + 深色 + 主题色，覆盖桌面浅色/深色两种场景。 */
+    static final int[] SOLID_COLORS = {
+            0xFFFDF8F3, 0xFFF3EBE2, 0xFFEADDFF, 0xFFDDE8F7,
+            0xFFD7F0E3, 0xFFF9DEE5, 0xFF2B2930, 0xFF3B4351,
+            0xFF6750A4, 0xFF006A6A, 0xFFA33A32, 0xFF4F6A00
+    };
+
+    static final String[] SOLID_NAMES = {
+            "米白", "奶油", "浅紫", "雾蓝", "薄荷", "樱粉",
+            "墨黑", "深灰", "紫罗兰", "青碧", "珊瑚", "橄榄"
+    };
+
+    /** 渐变：起始色、结束色、角度。统一用表达式强的双色线性渐变。 */
+    static final int[][] GRADIENTS = {
+            {0xFFF6D5F7, 0xFFD9E4FF, 135}, // 晨雾
+            {0xFFFFD8E4, 0xFFFFF0D9, 135}, // 蜜桃
+            {0xFFD7F5E9, 0xFFD6E4FF, 135}, // 薄荷海
+            {0xFFFFE7C2, 0xFFFFB4AB, 135}, // 日落
+            {0xFFE8DEF8, 0xFFB9C7FF, 160}, // 薰衣草
+            {0xFF2B2930, 0xFF6750A4, 135}, // 夜色紫
+            {0xFF0F2027, 0xFF2C5364, 135}, // 深海
+            {0xFFFFF9F0, 0xFFE8DCCB, 135}  // 纸感
+    };
+
+    static final String[] GRADIENT_NAMES = {
+            "晨雾", "蜜桃", "薄荷海", "日落", "薰衣草", "夜色紫", "深海", "纸感"
+    };
 
     private static final int MAX_WIDTH = 900;
 
@@ -48,9 +87,79 @@ final class CustomBackground {
         return Math.max(0, Math.min(100, prefs.getInt(KEY_BLUR_AMOUNT, 40)));
     }
 
-    /** 读自定义背景；没设置 / 读失败返回 null，调用方退回壁纸。 */
+    static String type(SharedPreferences prefs) {
+        String saved = prefs.getString(KEY_TYPE, TYPE_IMAGE);
+        if (TYPE_SOLID.equals(saved) || TYPE_GRADIENT.equals(saved)) return saved;
+        return TYPE_IMAGE;
+    }
+
+    static boolean isColorStyle(SharedPreferences prefs) {
+        return !TYPE_IMAGE.equals(type(prefs));
+    }
+
+    /** 当前样式有没有可渲染的内容；决定「使用自定义背景」开关是否可用。 */
+    static boolean hasContent(SharedPreferences prefs) {
+        if (TYPE_SOLID.equals(type(prefs))) return prefs.contains(KEY_SOLID);
+        if (TYPE_GRADIENT.equals(type(prefs))) {
+            return prefs.contains(KEY_GRADIENT_START) && prefs.contains(KEY_GRADIENT_END);
+        }
+        return !name(prefs).isEmpty();
+    }
+
+    static int solidColor(SharedPreferences prefs) {
+        return prefs.getInt(KEY_SOLID, SOLID_COLORS[0]);
+    }
+
+    static int gradientStart(SharedPreferences prefs) {
+        return prefs.getInt(KEY_GRADIENT_START, GRADIENTS[0][0]);
+    }
+
+    static int gradientEnd(SharedPreferences prefs) {
+        return prefs.getInt(KEY_GRADIENT_END, GRADIENTS[0][1]);
+    }
+
+    static int gradientAngle(SharedPreferences prefs) {
+        return prefs.getInt("customBgGradientAngle", GRADIENTS[0][2]);
+    }
+
+    static String gradientName(SharedPreferences prefs) {
+        return prefs.getString(KEY_GRADIENT_NAME, GRADIENT_NAMES[0]);
+    }
+
+    static String styleLabel(SharedPreferences prefs) {
+        if (TYPE_SOLID.equals(type(prefs))) {
+            return "纯色 · " + ThemeColors.hex(solidColor(prefs));
+        }
+        if (TYPE_GRADIENT.equals(type(prefs))) {
+            return "渐变 · " + gradientName(prefs);
+        }
+        return name(prefs);
+    }
+
+    /** 纯色/渐变背景大致是深色还是浅色，用来决定小组件文字用白还是黑。 */
+    static boolean isDarkStyle(SharedPreferences prefs) {
+        int color;
+        if (TYPE_SOLID.equals(type(prefs))) {
+            color = solidColor(prefs);
+        } else if (TYPE_GRADIENT.equals(type(prefs))) {
+            color = average(gradientStart(prefs), gradientEnd(prefs));
+        } else {
+            return false;
+        }
+        return androidx.core.graphics.ColorUtils.calculateLuminance(color) < 0.45;
+    }
+
+    /** 读自定义背景；图片走解码 + 可选模糊，纯色/渐变现画一张位图供预览用。 */
     static synchronized Bitmap load(Context context, SharedPreferences prefs) {
         if (!enabled(prefs)) return null;
+        if (isColorStyle(prefs) && hasContent(prefs)) {
+            return renderColorBitmap(context, 800, 800, prefs);
+        }
+        return loadImage(context, prefs);
+    }
+
+    /** 只加载图片背景；沿用原来的缓存与模糊。 */
+    private static synchronized Bitmap loadImage(Context context, SharedPreferences prefs) {
         String name = name(prefs);
         File file = ImageStore.resolve(context, name);
         if (file == null || !file.isFile()) {
@@ -135,6 +244,85 @@ final class CustomBackground {
         border.setColor(0x33FFFFFF);
         canvas.drawPath(shape, border);
         return out;
+    }
+
+    /**
+     * 按当前背景类型渲染圆角卡片：图片走原逻辑，纯色/渐变直接按卡片尺寸画。
+     * 纯色/渐变不参与高斯模糊，避免用户误以为模糊开关坏了。
+     */
+    static Bitmap renderCard(Context context, int widthPx, int heightPx,
+                             SharedPreferences prefs, float cornerDp) {
+        int w = Math.max(1, widthPx);
+        int h = Math.max(1, heightPx);
+        if (isColorStyle(prefs)) {
+            if (!hasContent(prefs)) return null;
+            return renderColorCard(context, w, h, prefs, cornerDp);
+        }
+        Bitmap source = loadImage(context, prefs);
+        if (source == null) return null;
+        // loadImage 已经按开关做过模糊，这里不再重复模糊
+        return renderCard(context, w, h, source, false, 0, cornerDp);
+    }
+
+    private static Bitmap renderColorBitmap(Context context, int w, int h,
+                                            SharedPreferences prefs) {
+        Bitmap out = Bitmap.createBitmap(Math.max(1, w), Math.max(1, h), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        drawColorStyle(canvas, out.getWidth(), out.getHeight(), prefs);
+        return out;
+    }
+
+    private static Bitmap renderColorCard(Context context, int w, int h,
+                                          SharedPreferences prefs, float cornerDp) {
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        float density = context.getResources().getDisplayMetrics().density;
+        float radius = Math.max(0f, Math.min(cornerDp * density, Math.min(w, h) / 2f));
+
+        Path shape = new Path();
+        shape.addRoundRect(new RectF(0, 0, w, h), radius, radius, Path.Direction.CW);
+        canvas.save();
+        canvas.clipPath(shape);
+        drawColorStyle(canvas, w, h, prefs);
+        canvas.restore();
+
+        Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+        border.setStyle(Paint.Style.STROKE);
+        border.setStrokeWidth(Math.max(1f, density));
+        border.setColor(isDarkStyle(prefs) ? 0x33FFFFFF : 0x22000000);
+        canvas.drawPath(shape, border);
+        return out;
+    }
+
+    private static void drawColorStyle(Canvas canvas, int w, int h, SharedPreferences prefs) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        if (TYPE_SOLID.equals(type(prefs))) {
+            paint.setColor(solidColor(prefs));
+        } else {
+            paint.setShader(gradientShader(w, h, gradientStart(prefs), gradientEnd(prefs),
+                    gradientAngle(prefs)));
+        }
+        canvas.drawRect(0, 0, w, h, paint);
+    }
+
+    private static Shader gradientShader(int w, int h, int start, int end, int angle) {
+        double radians = Math.toRadians(angle);
+        float cx = w / 2f;
+        float cy = h / 2f;
+        float length = (float) Math.hypot(w, h) / 2f;
+        float dx = (float) (Math.cos(radians) * length);
+        float dy = (float) (Math.sin(radians) * length);
+        return new LinearGradient(cx - dx, cy - dy, cx + dx, cy + dy,
+                start, end, Shader.TileMode.CLAMP);
+    }
+
+    static int averageColor(SharedPreferences prefs) {
+        if (TYPE_SOLID.equals(type(prefs))) return solidColor(prefs);
+        return average(gradientStart(prefs), gradientEnd(prefs));
+    }
+
+    private static int average(int start, int end) {
+        return androidx.core.graphics.ColorUtils.blendARGB(start, end, 0.5f);
     }
 
     private static void boxBlur(int[] pixels, int w, int h, int radius) {

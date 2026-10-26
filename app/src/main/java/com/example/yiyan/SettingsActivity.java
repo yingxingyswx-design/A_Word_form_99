@@ -3,6 +3,7 @@ package com.example.yiyan;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -24,7 +25,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
-public class SettingsActivity extends AppCompatActivity {
+public class SettingsActivity extends ThemedActivity {
 
     private static final int REQUEST_IMPORT_XML = 4401;
     private static final int REQUEST_PICK_BACKGROUND = 4402;
@@ -61,7 +62,6 @@ public class SettingsActivity extends AppCompatActivity {
 
         bindOrderMode();
         bindCategory();
-        bindOnlineRandom();
         bindShowHitokoto();
         bindParaphraseSwitch();
         bindFontSize();
@@ -217,7 +217,14 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (prefs == null) return;
+        if (prefs == null || isThemeChangePending()) return;
+        refreshThemeColorRow();
+        MaterialSwitch monet = findViewById(R.id.monet);
+        if (monet != null && monet.isChecked() != prefs.getBoolean("monet", false)) {
+            monet.setChecked(prefs.getBoolean("monet", false));
+        }
+        refreshCustomBackgroundUi();
+        syncGlassSwitch();
         boolean granted = WallpaperSource.canRead(this);
         refreshWallpaperPermission();
         if (granted && !wallpaperGranted) {
@@ -237,14 +244,17 @@ public class SettingsActivity extends AppCompatActivity {
         final Slider amount = findViewById(R.id.custom_bg_blur_amount);
         final TextView label = findViewById(R.id.custom_bg_blur_label);
 
-        // 必须先选图，才能打开「使用自定义背景」
-        boolean hasImage = imageSelected();
-        enabled.setEnabled(hasImage);
-        enabled.setChecked(hasImage && CustomBackground.enabled(prefs));
+        // 必须先选图 / 选色，才能打开「使用自定义背景」
+        boolean hasContent = CustomBackground.hasContent(prefs);
+        enabled.setEnabled(hasContent);
+        enabled.setChecked(hasContent && CustomBackground.enabled(prefs));
         blur.setChecked(CustomBackground.blurred(prefs));
         amount.setValue(CustomBackground.blurAmount(prefs));
         label.setText("模糊程度 · " + Math.round(amount.getValue()) + "%");
         refreshCustomBackgroundStatus();
+
+        findViewById(R.id.custom_bg_style).setOnClickListener(v ->
+                startActivity(new Intent(this, BackgroundStyleActivity.class)));
 
         findViewById(R.id.custom_bg_pick).setOnClickListener(v -> {
             try {
@@ -290,6 +300,7 @@ public class SettingsActivity extends AppCompatActivity {
                 scheduleWidgetRefresh();
             }
         });
+        refreshCustomBackgroundUi();
     }
 
     /** 选择器回调统一走这里：复制到私有目录 → 写 prefs → 打开开关 → 刷新。 */
@@ -303,16 +314,14 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
         prefs.edit()
+                .putString(CustomBackground.KEY_TYPE, CustomBackground.TYPE_IMAGE)
                 .putString(CustomBackground.KEY_NAME, name)
                 .putBoolean(CustomBackground.KEY_ENABLED, true)
+                .putBoolean(GlassRenderer.KEY_ENABLED, false)
                 .apply();
-        MaterialSwitch switchOn = findViewById(R.id.custom_bg_enabled);
-        if (switchOn != null) {
-            switchOn.setEnabled(true);
-            switchOn.setChecked(true);
-        }
+        syncGlassSwitch();
+        refreshCustomBackgroundUi();
         CustomBackground.invalidate();
-        refreshCustomBackgroundStatus();
         refreshPreviewBackdrop();
         scheduleWidgetRefresh();
         Toast.makeText(this, "已设为玻璃背景" + (CustomBackground.blurred(prefs) ? "（高斯模糊）" : ""),
@@ -324,9 +333,9 @@ public class SettingsActivity extends AppCompatActivity {
         if (glass != null) glass.setChecked(GlassRenderer.enabled(prefs));
     }
 
-    private boolean imageSelected() {
-        // 只要曾经选过就允许打开开关；文件真丢了渲染时会自动回退，并在状态行提示
-        return !CustomBackground.name(prefs).isEmpty();
+    /** 只要选过图片 / 纯色 / 渐变就允许打开开关；内容真丢了渲染时会回退。 */
+    private boolean hasCustomBackground() {
+        return CustomBackground.hasContent(prefs);
     }
 
     private void syncCustomBackgroundSwitch() {
@@ -339,17 +348,46 @@ public class SettingsActivity extends AppCompatActivity {
         if (preview != null) preview.invalidateWallpaper();
     }
 
+    private void refreshCustomBackgroundUi() {
+        boolean has = hasCustomBackground();
+        MaterialSwitch enabled = findViewById(R.id.custom_bg_enabled);
+        if (enabled != null) {
+            enabled.setEnabled(has);
+            enabled.setChecked(has && CustomBackground.enabled(prefs));
+        }
+        boolean image = CustomBackground.TYPE_IMAGE.equals(CustomBackground.type(prefs));
+        MaterialSwitch blur = findViewById(R.id.custom_bg_blur);
+        Slider amount = findViewById(R.id.custom_bg_blur_amount);
+        if (blur != null) {
+            blur.setEnabled(image);
+            blur.setAlpha(image ? 1f : 0.45f);
+        }
+        if (amount != null) {
+            amount.setEnabled(image);
+            amount.setAlpha(image ? 1f : 0.45f);
+        }
+        refreshCustomBackgroundStatus();
+    }
+
     private void refreshCustomBackgroundStatus() {
         TextView status = findViewById(R.id.custom_bg_status);
         if (status == null) return;
-        String name = CustomBackground.name(prefs);
-        boolean has = !name.isEmpty() && ImageStore.exists(this, name);
-        String blurText = CustomBackground.blurred(prefs)
-                ? "高斯模糊 " + CustomBackground.blurAmount(prefs) + "%" : "不模糊";
-        status.setText(has
-                ? "自定义背景：" + name + " · "
-                + (CustomBackground.enabled(prefs) ? "使用中 · " : "未启用 · ") + blurText
-                : "自定义背景：未设置（GIF 目前取第一帧）");
+        if (!hasCustomBackground()) {
+            status.setText("自定义背景：未设置（图片 / 纯色 / 渐变均可）");
+            return;
+        }
+        String type = CustomBackground.type(prefs);
+        StringBuilder text = new StringBuilder("自定义背景：")
+                .append(CustomBackground.styleLabel(prefs))
+                .append(" · ")
+                .append(CustomBackground.enabled(prefs) ? "使用中" : "未启用");
+        if (CustomBackground.TYPE_IMAGE.equals(type)) {
+            text.append(" · ").append(CustomBackground.blurred(prefs)
+                    ? "高斯模糊 " + CustomBackground.blurAmount(prefs) + "%" : "不模糊");
+        } else {
+            text.append(" · 不参与模糊");
+        }
+        status.setText(text.toString());
     }
     /** 回桌面自动换一句：root 常驻脚本监听焦点窗口，见 {@link RootHomeWatcher}。 */
     private void bindRootHomeWatch() {
@@ -497,18 +535,6 @@ public class SettingsActivity extends AppCompatActivity {
                 android.R.layout.simple_spinner_dropdown_item, cats));
     }
 
-    /** 在线随机一言开关。 */
-    private void bindOnlineRandom() {
-        MaterialSwitch online = findViewById(R.id.online_random);
-        online.setChecked(prefs.getBoolean("onlineRandom", false));
-        online.setOnCheckedChangeListener((button, checked) -> {
-            prefs.edit().putBoolean("onlineRandom", checked).apply();
-            sendBroadcast(new Intent(QuoteWidgetProvider.ACTION).setPackage(getPackageName()));
-            Toast.makeText(this, checked ? "已切换到在线随机一言" : "已回到本地语料",
-                    Toast.LENGTH_SHORT).show();
-        });
-    }
-
     /** 内置 Hitokoto 语料（随机分类）是否参与桌面轮换。 */
     private void bindShowHitokoto() {
         MaterialSwitch show = findViewById(R.id.show_hitokoto);
@@ -540,14 +566,43 @@ public class SettingsActivity extends AppCompatActivity {
     private void bindMonet() {
         MaterialSwitch monet = findViewById(R.id.monet);
         monet.setChecked(prefs.getBoolean("monet", false));
-        monet.setOnCheckedChangeListener((button, checked) ->
-                prefs.edit().putBoolean("monet", checked).apply());
+        monet.setOnCheckedChangeListener((button, checked) -> {
+            prefs.edit().putBoolean("monet", checked).apply();
+            refreshThemeColorRow();
+            scheduleWidgetRefresh();
+            // 开关自己占着前台，onResume 不会触发，必须主动重建才能让全 App 换色
+            if (!isThemeChangePending()) button.post(() -> {
+                if (!isFinishing()) recreate();
+            });
+        });
     }
 
+    /** 主题色改为二级页；这里只保留入口、当前色圆点和摘要。 */
     private void bindThemeColor() {
-        ColorPickerView picker = findViewById(R.id.color_picker);
-        picker.setOnColorChangedListener(color ->
-                prefs.edit().putInt("themeColor", color).apply());
+        findViewById(R.id.open_theme_color).setOnClickListener(v ->
+                startActivity(new Intent(this, ThemeColorActivity.class)));
+        refreshThemeColorRow();
+    }
+
+    private void refreshThemeColorRow() {
+        if (prefs == null) return;
+        View dot = findViewById(R.id.theme_color_dot);
+        TextView summary = findViewById(R.id.theme_color_summary);
+        if (dot == null || summary == null) return;
+
+        boolean monet = prefs.getBoolean("monet", false);
+        int color = monet ? ThemeColors.systemAccent(this) : ThemeColors.saved(prefs);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(color);
+        circle.setStroke(Math.max(1, Math.round(getResources().getDisplayMetrics().density)),
+                0x33000000);
+        dot.setBackground(circle);
+
+        summary.setText(monet
+                ? "跟随系统壁纸 · Monet"
+                : ThemeColors.nameOf(ThemeColors.saved(prefs)) + " · "
+                + ThemeColors.hex(ThemeColors.saved(prefs)));
     }
 
     private void bindAddQuote() {

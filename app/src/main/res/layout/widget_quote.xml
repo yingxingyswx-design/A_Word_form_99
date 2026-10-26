@@ -41,22 +41,26 @@
                 android:shadowDy="1.5"
                 android:gravity="top"
                 android:maxLines="8"
-                android:ellipsize="end" />
+                android:ellipsize="end"
+                android:lineSpacingExtra="2dp"
+                android:breakStrategy="high_quality"
+                android:hyphenationFrequency="none" />
 
             <TextView
                 android:id="@+id/quote_meta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:text="— 孔子 · 《论语》 · 原文"
                 android:textColor="@color/accent"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:shadowColor="#22000000"
                 android:shadowRadius="4"
                 android:shadowDx="0"
                 android:shadowDy="1.5"
-                android:maxLines="3"
-                android:ellipsize="end" />
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:lineSpacingExtra="1dp" />
 
             <TextView
                 android:id="@+id/next_hint"
@@ -64,14 +68,14 @@
                 android:layout_height="wrap_content"
                 android:text="点按换一句"
                 android:textColor="#776F80"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:gravity="right" />
         </LinearLayout>
 
         <FrameLayout
-            android:layout_width="78dp"
+            android:layout_width="72dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="10dp">
+            android:layout_marginStart="8dp">
 
             <!-- 静态图；GIF 时它作为首帧垫底，桌面不支持集合控件也至少能显示一帧 -->
             <ImageView
