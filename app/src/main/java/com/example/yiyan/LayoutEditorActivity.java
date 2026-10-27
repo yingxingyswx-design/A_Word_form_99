@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import com.google.android.material.materialswitch.MaterialSwitch;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -58,38 +59,44 @@ public class LayoutEditorActivity extends ThemedActivity {
         applyDetectedWidgetSize(false);
         updateHint();
 
-        MaterialSwitch boxSwitch = findViewById(R.id.sw_text_box);
-        boxSwitch.setChecked(scene.textBox);
-        boxSwitch.setOnCheckedChangeListener((button, checked) -> {
-            scene.textBox = checked;
-            canvas.invalidate();
-        });
-
         findViewById(R.id.btn_add_image).setOnClickListener(v -> pickImage());
         findViewById(R.id.btn_delete).setOnClickListener(v -> deleteSelected());
-        findViewById(R.id.btn_rotate).setOnClickListener(v -> rotateSelected(ROTATE_STEP));
-        findViewById(R.id.btn_rotate).setOnLongClickListener(v -> {
-            resetSelectedRotation();
-            return true;
-        });
-        findViewById(R.id.btn_flip_h).setOnClickListener(v -> flipSelected(true));
-        findViewById(R.id.btn_flip_v).setOnClickListener(v -> flipSelected(false));
-        findViewById(R.id.btn_width_minus).setOnClickListener(v -> resizeWidget(-40, 0));
-        findViewById(R.id.btn_width_plus).setOnClickListener(v -> resizeWidget(40, 0));
-        findViewById(R.id.btn_height_minus).setOnClickListener(v -> resizeWidget(0, -20));
-        findViewById(R.id.btn_height_plus).setOnClickListener(v -> resizeWidget(0, 20));
-        findViewById(R.id.btn_read_size).setOnClickListener(v -> {
+        // 右上角：文字框开关（只控制显示 / 隐藏，文字本身不能删除）
+        findViewById(R.id.btn_text_toggle).setOnClickListener(v -> toggleTextBox());
+        // 「更多」只保留读取桌面实际组件大小，其余次要操作已去掉
+        findViewById(R.id.btn_more).setOnClickListener(v -> {
             if (!applyDetectedWidgetSize(true)) showAccessibilityHelp();
         });
-        findViewById(R.id.btn_reset).setOnClickListener(v -> {
-            scene = CustomScene.defaults();
-            canvas.setScene(scene);
-            canvas.clearSelection();
-            boxSwitch.setChecked(scene.textBox);
-            reloadBitmaps();
-            updateHint();
-        });
         findViewById(R.id.btn_save).setOnClickListener(v -> save());
+        refreshTextToggle();
+    }
+
+    private void toggleTextBox() {
+        canvas.setTextBox(!canvas.isTextBoxOn());
+        refreshTextToggle();
+        updateHint();
+    }
+
+    private void refreshTextToggle() {
+        View toggle = findViewById(R.id.btn_text_toggle);
+        if (!(toggle instanceof TextView)) return;
+        ((TextView) toggle).setText(canvas.isTextBoxOn() ? "隐藏文字框" : "显示文字框");
+    }
+
+    /** 删除当前选中的图片；未选中图片时提示。 */
+    private void deleteSelected() {
+        if (!canvas.isImageSelected()) {
+            Toast.makeText(this, "先选中一张图片", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int index = canvas.getSelectedIndex();
+        if (index < 0 || index >= scene.images.size()) return;
+        CustomScene.ImageBox removed = scene.images.remove(index);
+        ImageStore.deleteWithFrames(this, removed.name);
+        canvas.setScene(scene);
+        canvas.clearSelection();
+        reloadBitmaps();
+        updateHint();
     }
 
     // ---- 图片 ----
@@ -147,77 +154,6 @@ public class LayoutEditorActivity extends ThemedActivity {
         scene.images.add(box);
         canvas.setScene(scene);
         reloadBitmaps();
-        updateHint();
-    }
-
-    private void deleteSelected() {
-        if (canvas.getSelectedType() != LayoutCanvasView.TYPE_IMAGE) {
-            Toast.makeText(this, "先选中一张图片", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        int index = canvas.getSelectedIndex();
-        if (index < 0 || index >= scene.images.size()) return;
-        CustomScene.ImageBox box = scene.images.remove(index);
-        ImageStore.deleteWithFrames(this, box.name);
-        canvas.setScene(scene);
-        canvas.clearSelection();
-        reloadBitmaps();
-        updateHint();
-    }
-
-    private void rotateSelected(float delta) {
-        CustomScene.Box box = selectedBox();
-        if (box == null) {
-            Toast.makeText(this, "先选中文字框或图片", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        box.rotation = CustomScene.normalizeRotation(box.rotation + delta);
-        canvas.invalidate();
-        updateHint();
-    }
-
-    private void resetSelectedRotation() {
-        CustomScene.Box box = selectedBox();
-        if (box == null) {
-            Toast.makeText(this, "先选中文字框或图片", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        box.rotation = 0f;
-        canvas.invalidate();
-        updateHint();
-    }
-
-    private void flipSelected(boolean horizontal) {
-        if (canvas.getSelectedType() != LayoutCanvasView.TYPE_IMAGE) {
-            Toast.makeText(this, "先选中一张图片", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        int index = canvas.getSelectedIndex();
-        if (index < 0 || index >= scene.images.size()) return;
-        CustomScene.ImageBox box = scene.images.get(index);
-        if (horizontal) {
-            box.flipH = !box.flipH;
-        } else {
-            box.flipV = !box.flipV;
-        }
-        reloadBitmaps();
-        updateHint();
-    }
-
-    private CustomScene.Box selectedBox() {
-        if (canvas.getSelectedType() == LayoutCanvasView.TYPE_TEXT) return scene.text;
-        if (canvas.getSelectedType() == LayoutCanvasView.TYPE_IMAGE) {
-            int index = canvas.getSelectedIndex();
-            if (index >= 0 && index < scene.images.size()) return scene.images.get(index);
-        }
-        return null;
-    }
-
-    private void resizeWidget(int deltaWidth, int deltaHeight) {
-        userResized = true;
-        scene.widthDp = Math.max(160, Math.min(900, scene.widthDp + deltaWidth));
-        scene.heightDp = Math.max(100, Math.min(520, scene.heightDp + deltaHeight));
-        canvas.invalidate();
         updateHint();
     }
 
@@ -336,10 +272,11 @@ public class LayoutEditorActivity extends ThemedActivity {
         if (sizeDetected) {
             size += " · 桌面实测 " + detectedWidthDp + "×" + detectedHeightDp + "dp";
         }
+        // 主界面不再堆按钮：选中后提示全屏拖动，其余操作在「更多」里
         hint.setText(size + " · " + scene.images.size() + "/" + MAX_IMAGES
                 + " 张图片 · " + selected
-                + "\n拖动移动，拖右下角改大小，拖右上角圆点任意角度旋转；框之间可以重叠"
-                + "\n「旋转」每按一次 +" + Math.round(ROTATE_STEP) + "°，长按归零");
+                + "\n选中后按住画布任意位置即可拖动；右下角改大小，右上角圆点旋转"
+                + "\n右上角可开关文字框描边（文字本身永远保留，不会被删除）");
     }
 
     @Override

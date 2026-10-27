@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  自定义布局编辑器：画布占满，底部只保留「添加图片 / 保存」，
+  其余操作（删除、镜像、旋转、文字框、尺寸）都收进右上角「更多」菜单。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -8,14 +12,38 @@
     android:paddingTop="8dp"
     android:paddingBottom="8dp">
 
-    <TextView
-        android:id="@+id/editor_hint"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="拖动移动，拖右下角改大小，拖右上角圆点任意角度旋转；框之间可以重叠"
-        android:textAppearance="?attr/textAppearanceBodySmall"
-        android:textColor="?attr/colorOnSurfaceVariant" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/editor_hint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:text="选中后可在画布任意位置拖动，拖右下角改大小，拖右上角圆点旋转"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_text_toggle"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="隐藏文字框" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_more"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="读取桌面大小" />
+    </LinearLayout>
 
     <com.google.android.material.card.MaterialCardView
         style="@style/Widget.Yiyan.Card"
@@ -44,7 +72,6 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="2"
             android:text="添加图片" />
 
         <com.google.android.material.button.MaterialButton
@@ -52,111 +79,16 @@
             style="@style/Widget.Yiyan.Button.Tonal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:text="删除" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_rotate"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="旋转" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_flip_h"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="水平镜像" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_flip_v"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="垂直镜像" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sw_text_box"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.2"
-            android:text="文字框" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_width_minus"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="宽 -" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_width_plus"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="宽 +" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_height_minus"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="高 -" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_height_plus"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="高 +" />
-    </LinearLayout>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_read_size"
-        style="@style/Widget.Yiyan.Button.Tonal"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="读取桌面组件大小（无障碍）" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_reset"
-            style="@style/Widget.Yiyan.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="恢复默认" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_save"
             style="@style/Widget.Yiyan.Button"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:text="保存" />
     </LinearLayout>

@@ -424,6 +424,7 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
         views.setViewPadding(R.id.text_wrap, textLeft, textTop,
                 Math.max(0, contentWidth - textLeft - textWidth),
                 Math.max(0, contentHeight - textTop - textHeight));
+        // 只控制文字框的那圈描边；文字本身永远显示，不会被删除
         views.setViewVisibility(R.id.text_box, scene.textBox ? View.VISIBLE : View.GONE);
         // 文字框和文字一起绕框中心旋转。旋转必须落在真正的框视图上：
         // text_wrap 本身是整块小组件，padding 只是把子视图挤成框的大小。

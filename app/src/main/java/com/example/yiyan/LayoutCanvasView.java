@@ -107,6 +107,8 @@ public class LayoutCanvasView extends View {
         handleStrokePaint.setStrokeWidth(dp(2));
         handleStrokePaint.setColor(0xFFFFFFFF);
 
+        // 平移改成「选中后整块画布都能拖」，画布本身不应把手势交给横向滑动的父容器
+        setClickable(true);
         setPadding((int) dp(12), (int) dp(12), (int) dp(16), (int) dp(16));
     }
 
@@ -169,9 +171,73 @@ public class LayoutCanvasView extends View {
         return selectedIndex;
     }
 
+    boolean isTextBoxOn() {
+        return scene.textBox;
+    }
+
     void clearSelection() {
         selectedType = TYPE_NONE;
         selectedIndex = -1;
+        invalidate();
+        notifyChanged();
+    }
+
+    /** 底部操作栏要显示的按钮：文字框 / 图片 / 无选中各不相同。 */
+    boolean hasSelection() {
+        return selectedType != TYPE_NONE;
+    }
+
+    boolean isTextSelected() {
+        return selectedType == TYPE_TEXT;
+    }
+
+    boolean isImageSelected() {
+        return selectedType == TYPE_IMAGE;
+    }
+
+    /** 删除当前选中的图片；返回是否真的删了。 */
+    boolean deleteSelectedImage() {
+        if (selectedType != TYPE_IMAGE || selectedIndex < 0 || selectedIndex >= scene.images.size()) {
+            return false;
+        }
+        scene.images.remove(selectedIndex);
+        clearSelection();
+        return true;
+    }
+
+    void flipSelectedImage(boolean horizontal) {
+        if (selectedType != TYPE_IMAGE || selectedIndex < 0 || selectedIndex >= scene.images.size()) {
+            return;
+        }
+        CustomScene.ImageBox box = scene.images.get(selectedIndex);
+        if (horizontal) box.flipH = !box.flipH;
+        else box.flipV = !box.flipV;
+        invalidate();
+        notifyChanged();
+    }
+
+    /** 选中的框每次旋转 +1°，长按归零。返回是否处理成功。 */
+    boolean rotateSelected(float delta) {
+        CustomScene.Box box = selectedBox();
+        if (box == null) return false;
+        box.rotation = CustomScene.normalizeRotation(box.rotation + delta);
+        invalidate();
+        notifyChanged();
+        return true;
+    }
+
+    boolean resetSelectedRotation() {
+        CustomScene.Box box = selectedBox();
+        if (box == null) return false;
+        box.rotation = 0f;
+        invalidate();
+        notifyChanged();
+        return true;
+    }
+
+    /** 显示 / 隐藏文字框（那圈描边）；文字本身永远保留，不能被删除。 */
+    void setTextBox(boolean enabled) {
+        scene.textBox = enabled;
         invalidate();
         notifyChanged();
     }
@@ -386,6 +452,7 @@ public class LayoutCanvasView extends View {
             case MotionEvent.ACTION_CANCEL:
                 mode = MODE_NONE;
                 dragOrigin = null;
+                if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
                 notifyChanged();
                 return true;
             default:
@@ -396,9 +463,13 @@ public class LayoutCanvasView extends View {
     private boolean onDown(MotionEvent event) {
         downX = event.getX();
         downY = event.getY();
+        getParent().requestDisallowInterceptTouchEvent(true);
         computeContentRect();
 
-        // 已选中时，先给旋转 / 缩放手柄最高的命中优先级
+        // 命中优先级：旋转手柄 > 缩放手柄 > 当前选中的框 > 其它框 >
+        // 已选中时按在空白处也算平移（全屏拖拽）。
+
+        // 1. 手柄
         CustomScene.Box current = selectedBox();
         if (current != null) {
             RectF rect = boxRect(current);
@@ -416,32 +487,66 @@ public class LayoutCanvasView extends View {
                 dragOrigin = new RectF(rect);
                 return true;
             }
-        }
-
-        // 图片优先命中（后添加的在上层），文字在最底层
-        for (int i = scene.images.size() - 1; i >= 0; i--) {
-            CustomScene.ImageBox box = scene.images.get(i);
-            if (insideBox(box, downX, downY)) {
-                selectedType = TYPE_IMAGE;
-                selectedIndex = i;
+            // 2. 当前选中的框：按在它身上直接平移
+            if (insideBox(current, downX, downY)) {
                 mode = MODE_MOVE;
-                dragOrigin = new RectF(boxRect(box));
-                invalidate();
-                notifyChanged();
+                dragOrigin = new RectF(rect);
                 return true;
             }
         }
-        if (insideBox(scene.text, downX, downY)) {
-            selectedType = TYPE_TEXT;
-            selectedIndex = -1;
+
+        // 3. 图片和文字框重叠是常态：点第二个候选会在两者之间切换，
+        //    否则小图片一旦被大图 / 文字盖住就再也选不到。
+        boolean preferImage = selectedType != TYPE_IMAGE;
+        int hitImageIndex = -1;
+        for (int i = scene.images.size() - 1; i >= 0; i--) {
+            if (insideBox(scene.images.get(i), downX, downY)) {
+                hitImageIndex = i;
+                break;
+            }
+        }
+        boolean hitText = insideBox(scene.text, downX, downY);
+
+        if (hitImageIndex >= 0 && hitText) {
+            if (preferImage) selectImage(hitImageIndex);
+            else selectText();
+            return true;
+        }
+        if (hitImageIndex >= 0) {
+            selectImage(hitImageIndex);
+            return true;
+        }
+        if (hitText) {
+            selectText();
+            return true;
+        }
+
+        // 4. 点空白处：保持选中，后续手指移动就是全屏平移
+        if (current != null) {
             mode = MODE_MOVE;
-            dragOrigin = new RectF(boxRect(scene.text));
-            invalidate();
-            notifyChanged();
+            dragOrigin = new RectF(boxRect(current));
             return true;
         }
         clearSelection();
         return true;
+    }
+
+    private void selectImage(int index) {
+        selectedType = TYPE_IMAGE;
+        selectedIndex = index;
+        mode = MODE_MOVE;
+        dragOrigin = new RectF(boxRect(scene.images.get(index)));
+        invalidate();
+        notifyChanged();
+    }
+
+    private void selectText() {
+        selectedType = TYPE_TEXT;
+        selectedIndex = -1;
+        mode = MODE_MOVE;
+        dragOrigin = new RectF(boxRect(scene.text));
+        invalidate();
+        notifyChanged();
     }
 
     private boolean onMove(MotionEvent event) {
