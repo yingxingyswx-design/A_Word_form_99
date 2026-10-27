@@ -27,10 +27,17 @@ final class WidgetPresetStore {
     static final int MAX = 10;
     private static final String KEY = "savedWidgetPresets";
 
-    /** 保存和还原的外观键；顺序不影响 JSON。 */
+    private static final String LAYOUT_FLAG = "customLayout";
+    private static final String LEGACY_LAYOUT_FLAG = "customlayout";
+
+    /**
+     * 保存和还原的外观键；顺序不影响 JSON。
+     * 注意：lastQuote* 是「当前正在显示的那一句」，不属于外观，
+     * 不能写进预设，否则查看旧预设时显示的是之后换过的句子（之前就踩过这个坑）。
+     */
     private static final String[] SNAPSHOT_KEYS = {
             "fontSize", "themeColor", "monet", "backgroundColor",
-            "customLayout", CustomScene.PREF_KEY,
+            LAYOUT_FLAG, LEGACY_LAYOUT_FLAG, CustomScene.PREF_KEY,
             GlassRenderer.KEY_ENABLED, GlassRenderer.KEY_MATERIAL,
             GlassRenderer.KEY_BLUR, GlassRenderer.KEY_DENSITY,
             GlassRenderer.KEY_HIGHLIGHT, GlassRenderer.KEY_CORNER,
@@ -41,9 +48,7 @@ final class WidgetPresetStore {
             CustomBackground.KEY_GRADIENT_NAME, "customBgGradientAngle",
             CustomBackground.KEY_BLUR, CustomBackground.KEY_BLUR_AMOUNT,
             GlassAlign.KEY_MODE, GlassAlign.KEY_OFFSET_X, GlassAlign.KEY_OFFSET_Y,
-            "xposedGlass",
-            // 仅用于「查看小组件视图」的示例文字 / 配图快照
-            "lastQuoteText", "lastQuoteMeta", "lastQuoteImage"
+            "xposedGlass"
     };
 
     private WidgetPresetStore() {
@@ -90,6 +95,12 @@ final class WidgetPresetStore {
                 if (all.containsKey(key)) values.put(key, all.get(key));
                 else values.put(key, JSONObject.NULL);
             }
+            // 例外：保存时的句子 / 配图，只用于「查看小组件视图」，还原外观时不会覆盖
+            values.put("snapshotText", prefs.getString("lastQuoteText",
+                    "知者不惑，仁者不忧，勇者不惧。"));
+            values.put("snapshotMeta", prefs.getString("lastQuoteMeta",
+                    "— 孔子 · 《论语》 · 原文"));
+            values.put("snapshotImage", prefs.getString("lastQuoteImage", ""));
             Preset preset = new Preset(System.currentTimeMillis(), name,
                     System.currentTimeMillis(), values);
             presets.add(preset);
@@ -134,8 +145,34 @@ final class WidgetPresetStore {
                 editor.putString(key, String.valueOf(value));
             }
         }
+        // 兼容老预设：只有小写键时也把开关补上，否则还原后还是默认布局
+        if (!preset.values.has(LAYOUT_FLAG) && preset.values.has(LEGACY_LAYOUT_FLAG)) {
+            Object legacy = preset.values.opt(LEGACY_LAYOUT_FLAG);
+            if (legacy instanceof Boolean) editor.putBoolean(LAYOUT_FLAG, (Boolean) legacy);
+        }
         editor.apply();
         CustomBackground.invalidate();
+    }
+
+    /**
+     * 是否使用自定义布局。
+     * 老版本保存时写的是小写键 {@code customlayout}，读的是 {@code customLayout}，
+     * 结果预设里明明有 layout 场景却一直按默认布局显示。
+     */
+    static boolean usesCustomLayout(JSONObject values) {
+        if (values.optBoolean(LAYOUT_FLAG, false)) return true;
+        if (values.optBoolean(LEGACY_LAYOUT_FLAG, false)) return true;
+        // 兜底：有可解析的场景数据就视为自定义布局
+        String json = values.optString(CustomScene.PREF_KEY, "");
+        if (json == null || json.trim().isEmpty()) return false;
+        try {
+            CustomScene scene = CustomScene.fromJson(new JSONObject(json));
+            return scene != null && (!scene.images.isEmpty() || scene.textBox
+                    || Math.abs(scene.text.w - 0.88f) > 0.001f
+                    || Math.abs(scene.text.h - 0.80f) > 0.001f);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static void save(SharedPreferences prefs, List<Preset> presets) {
@@ -200,10 +237,12 @@ final class WidgetPresetStore {
                 background = "纯色底";
             }
 
-            String layout = values.optBoolean("customLayout", false) ? "自定义布局" : "默认布局";
+            String layout = usesCustomLayout(values) ? "自定义布局" : "默认布局";
+            String fontSize = values.optInt("fontSize", 16) + "sp";
             String time = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
                     .format(new Date(createdAt));
-            return theme + " · " + background + " · " + layout + " · " + time;
+            return theme + " · " + background + " · " + layout + " · " + fontSize
+                    + " · " + time;
         }
     }
 }

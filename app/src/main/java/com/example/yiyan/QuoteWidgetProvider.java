@@ -27,6 +27,7 @@ import android.widget.RemoteViews;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
 
@@ -48,15 +49,32 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
     /** launcher 会在上报的小组件尺寸之外再扣一圈宿主内边距，这里按 dp 估一个值。 */
     private static final int HOST_INSET_DP = 8;
 
-    /** 自定义布局的图片槽位上限：RemoteViews 布局是静态的，只能预先摆好固定数量的槽。 */
-    private static final int MAX_IMAGE_SLOTS = 4;
-    private static final int[] SLOT_WRAP = {
-            R.id.image_wrap1, R.id.image_wrap2, R.id.image_wrap3, R.id.image_wrap4};
-    private static final int[] SLOT_IMAGE = {
-            R.id.quote_image1, R.id.quote_image2, R.id.quote_image3, R.id.quote_image4};
-    private static final int[] SLOT_FLIPPER = {
-            R.id.quote_image_flipper1, R.id.quote_image_flipper2,
-            R.id.quote_image_flipper3, R.id.quote_image_flipper4};
+    /**
+     * 自定义布局的图片槽位上限。RemoteViews 布局是静态的，只能预先摆好固定数量的槽，
+     * 所以这个数必须和 {@code widget_image_slots.xml} 里的槽位数量一致。
+     */
+    static final int MAX_IMAGE_SLOTS = 40;
+    private static final int[] SLOT_WRAP = layoutIds("image_wrap%d");
+    private static final int[] SLOT_IMAGE = layoutIds("quote_image%d");
+    private static final int[] SLOT_FLIPPER = layoutIds("quote_image_flipper%d");
+
+    /** 按 slot_image_N / slot_image_flipper_N 的命名规律取 id：1..MAX_IMAGE_SLOTS。 */
+    private static int[] layoutIds(String format) {
+        int[] ids = new int[MAX_IMAGE_SLOTS];
+        for (int i = 0; i < MAX_IMAGE_SLOTS; i++) {
+            ids[i] = context().getResources().getIdentifier(
+                    String.format(Locale.ROOT, format, i + 1), "id", context().getPackageName());
+            if (ids[i] == 0) {
+                throw new IllegalStateException("缺少图片槽位资源：" + String.format(format, i + 1));
+            }
+        }
+        return ids;
+    }
+
+    private static android.content.Context context() {
+        // getResources() 需要 Context；这里只用来查 id，借助 App 全局实例
+        return com.example.yiyan.DailyApp.getInstance();
+    }
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {

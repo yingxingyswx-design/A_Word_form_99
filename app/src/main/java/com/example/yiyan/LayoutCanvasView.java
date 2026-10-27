@@ -52,7 +52,8 @@ public class LayoutCanvasView extends View {
     private final RectF contentRect = new RectF();
 
     private CustomScene scene = CustomScene.defaults();
-    private final Bitmap[] bitmaps = new Bitmap[4];
+    /** 与小组件槽位数一致：自定义布局最多这么多张图片。 */
+    private final Bitmap[] bitmaps = new Bitmap[QuoteWidgetProvider.MAX_IMAGE_SLOTS];
     private String quoteText = "知者不惑。";
     private String metaText = "— 孔子 · 《论语》 · 原文";
 

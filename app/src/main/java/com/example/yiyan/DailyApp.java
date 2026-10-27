@@ -14,9 +14,17 @@ public class DailyApp extends Application {
     /** 液态玻璃参数版本：换一套默认值时 +1，老安装只会被重写一次。 */
     private static final int GLASS_DEFAULTS_VERSION = 8;
 
+    private static DailyApp instance;
+
+    /** 小组件 Provider 里没有 Activity 上下文，需要它来查资源 id。 */
+    static DailyApp getInstance() {
+        return instance;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         DynamicColors.applyToActivitiesIfAvailable(this);
         migrateGlassDefaults();
     }

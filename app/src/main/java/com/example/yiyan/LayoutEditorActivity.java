@@ -11,6 +11,9 @@ import com.google.android.material.materialswitch.MaterialSwitch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 自定义布局编辑器。
  *
@@ -21,7 +24,8 @@ import android.widget.Toast;
 public class LayoutEditorActivity extends ThemedActivity {
 
     private static final int REQUEST_PICK_IMAGE = 4301;
-    private static final int MAX_IMAGES = 4;
+    /** 上限跟小组件槽位数走（RemoteViews 布局是静态的），见 widget_quote_custom.xml。 */
+    private static final int MAX_IMAGES = QuoteWidgetProvider.MAX_IMAGE_SLOTS;
     /** 「旋转」按钮每次微调多少度；按住可以归零。 */
     private static final float ROTATE_STEP = 1f;
 
@@ -91,10 +95,6 @@ public class LayoutEditorActivity extends ThemedActivity {
     // ---- 图片 ----
 
     private void pickImage() {
-        if (scene.images.size() >= MAX_IMAGES) {
-            Toast.makeText(this, "最多放 " + MAX_IMAGES + " 张图片", Toast.LENGTH_SHORT).show();
-            return;
-        }
         // 走系统相册（Google Photos / 图库），不要文件管理器
         if (!ImagePicker.pick(this, REQUEST_PICK_IMAGE)) {
             Toast.makeText(this, "没有可用的相册选择器", Toast.LENGTH_SHORT).show();
@@ -111,6 +111,13 @@ public class LayoutEditorActivity extends ThemedActivity {
         String name = ImageStore.importFrom(this, uri);
         if (name == null) {
             Toast.makeText(this, "无法读取这张图片（过大或格式不支持）", Toast.LENGTH_LONG).show();
+            return;
+        }
+        // 槽位是有限的静态布局，超出的图片必须提示并回收，避免留下孤立文件
+        if (scene.images.size() >= MAX_IMAGES) {
+            ImageStore.deleteWithFrames(this, name);
+            Toast.makeText(this, "最多放 " + MAX_IMAGES + " 张图片，请先删除一张",
+                    Toast.LENGTH_LONG).show();
             return;
         }
         if (ImageStore.isGif(name)) {
@@ -282,19 +289,27 @@ public class LayoutEditorActivity extends ThemedActivity {
                 .show();
     }
 
+    private int bitmapToken;
+
+    /** 每次调用都作废上一轮加载，避免快速增删图片时旧结果覆盖新布局。 */
     private void reloadBitmaps() {
-        for (int i = 0; i < MAX_IMAGES; i++) {
-            if (i >= scene.images.size()) {
-                canvas.setBitmap(i, null);
-                continue;
+        final int token = ++bitmapToken;
+        final List<CustomScene.ImageBox> snapshot = new ArrayList<>(scene.images);
+        new Thread(() -> {
+            for (int i = 0; i < MAX_IMAGES; i++) {
+                final int index = i;
+                final String source = i < snapshot.size()
+                        ? firstFrameName(snapshot.get(i).name) : null;
+                final CustomScene.ImageBox box = i < snapshot.size() ? snapshot.get(i) : null;
+                final Bitmap bitmap = box == null ? null
+                        : ImageStore.decodeFlipped(getApplicationContext(), source, 480,
+                        box.flipH, box.flipV);
+                runOnUiThread(() -> {
+                    if (token != bitmapToken) return;
+                    canvas.setBitmap(index, bitmap);
+                });
             }
-            CustomScene.ImageBox box = scene.images.get(i);
-            String source = firstFrameName(box.name);
-            // 旋转交给画布，这里只烘焙镜像
-            Bitmap bitmap = ImageStore.decodeFlipped(this, source, 480,
-                    box.flipH, box.flipV);
-            canvas.setBitmap(i, bitmap);
-        }
+        }, "layout-thumbs").start();
     }
 
     private String firstFrameName(String name) {

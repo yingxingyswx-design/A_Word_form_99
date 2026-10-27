@@ -21,16 +21,17 @@ import org.json.JSONObject;
 import java.util.List;
 
 /**
- * 保存组件的 2×2 外观预览。
+ * 保存组件的真实小组件视图预览。
  *
- * 按预设里的主题、背景、字号、自定义布局场景和图片重新绘制一张卡片，
- * 而不是简单显示一个色块。自定义布局里的文字框 / 图片框位置、旋转、镜像都会还原；
- * 背景图片和语录配图异步解码，避免打开弹窗时卡顿。
+ * 不是色块：按预设里的背景 / 字号 / 颜色 / 自定义布局（文字框、图片框的位置、旋转、
+ * 翻转、图片比例）把小组件重新画一遍。2×2 与 4×2 走与桌面相同的分支：
+ * 2×2 = 紧凑版（无配图、正文满宽），4×2 = 常规版（正文 + 右侧配图、完整作者行）。
  */
 public class WidgetPresetPreviewView extends View {
 
     private static final String SAMPLE = "知者不惑，仁者不忧，勇者不惧。";
     private static final String SAMPLE_META = "— 孔子 · 《论语》 · 原文";
+    private static final int SAMPLE_META_MAX_WIDTH = 12;
 
     private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -43,12 +44,26 @@ public class WidgetPresetPreviewView extends View {
     private CustomScene scene;
     private Bitmap backgroundImage;
     private Bitmap quoteImage;
-    private final Bitmap[] sceneImages = new Bitmap[4];
+    private final Bitmap[] sceneImages = new Bitmap[QuoteWidgetProvider.MAX_IMAGE_SLOTS];
     private int imageToken;
+    private int cellsWide = 2;
 
     public WidgetPresetPreviewView(Context context, AttributeSet attrs) {
         super(context, attrs);
         borderPaint.setStyle(Paint.Style.STROKE);
+        textPaint.setAntiAlias(true);
+        metaPaint.setAntiAlias(true);
+    }
+
+    /** 预览的桌面尺寸：2×2 = 2 格宽；4×2 = 4 格宽（AppWidget 的 70dp 规则）。 */
+    public void setPreviewCells(int cellsWide) {
+        this.cellsWide = cellsWide >= 4 ? 4 : 2;
+        requestLayout();
+        invalidate();
+    }
+
+    public int getPreviewCells() {
+        return cellsWide;
     }
 
     public void setPreset(WidgetPresetStore.Preset preset) {
@@ -63,7 +78,7 @@ public class WidgetPresetPreviewView extends View {
             return;
         }
 
-        if (preset.values.optBoolean("customLayout", false)) {
+        if (WidgetPresetStore.usesCustomLayout(preset.values)) {
             String json = preset.values.optString(CustomScene.PREF_KEY, "");
             if (!json.isEmpty()) {
                 try {
@@ -78,14 +93,15 @@ public class WidgetPresetPreviewView extends View {
                 CustomBackground.KEY_ENABLED, false)
                 && CustomBackground.TYPE_IMAGE.equals(preset.values.optString(
                 CustomBackground.KEY_TYPE, CustomBackground.TYPE_IMAGE));
-        final String quoteName = preset.values.optString("lastQuoteImage", "");
+        final String quoteName = preset.values.optString("snapshotImage", "");
         final CustomScene snapshot = scene;
         new Thread(() -> {
             Bitmap bg = hasBackgroundImage ? decodeFirst(backgroundName) : null;
             Bitmap quote = quoteName.isEmpty() ? null : decodeFirst(quoteName);
-            Bitmap[] images = new Bitmap[4];
+            Bitmap[] images = new Bitmap[QuoteWidgetProvider.MAX_IMAGE_SLOTS];
             if (snapshot != null) {
-                for (int i = 0; i < Math.min(4, snapshot.images.size()); i++) {
+                for (int i = 0; i < Math.min(QuoteWidgetProvider.MAX_IMAGE_SLOTS,
+                        snapshot.images.size()); i++) {
                     CustomScene.ImageBox box = snapshot.images.get(i);
                     String name = firstFrame(box.name);
                     if (!name.isEmpty()) {
@@ -116,13 +132,48 @@ public class WidgetPresetPreviewView extends View {
         return first.isEmpty() ? null : ImageStore.decode(getContext(), first, 640);
     }
 
+    // ---- 测量与版面 ----
+
+    /** 2×2 按 1:1，4×2 按 2:1；与桌面 AppWidget 的实际比例一致。 */
+    private float targetAspect() {
+        return cellsWide >= 4 ? 2f : 1f;
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+            width = Math.round(dp(320));
+        }
+        int availWidth = Math.max(1, width - getPaddingLeft() - getPaddingRight());
+        int height = Math.round(availWidth / targetAspect())
+                + getPaddingTop() + getPaddingBottom();
+        setMeasuredDimension(width, resolveSize(height, heightMeasureSpec));
+    }
+
+    private void layoutCard() {
+        float inset = dp(6);
+        float availW = Math.max(1f, getWidth() - inset * 2);
+        float availH = Math.max(1f, getHeight() - inset * 2);
+        float width = availW;
+        float height = width / targetAspect();
+        if (height > availH) {
+            height = availH;
+            width = height * targetAspect();
+        }
+        float left = getWidth() / 2f - width / 2f;
+        float top = getHeight() / 2f - height / 2f;
+        card.set(left, top, left + width, top + height);
+    }
+
+    // ---- 绘制 ----
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (preset == null || getWidth() == 0 || getHeight() == 0) return;
+        layoutCard();
         float density = getResources().getDisplayMetrics().density;
-        float inset = dp(6);
-        card.set(inset, inset, getWidth() - inset, getHeight() - inset);
         int corner = preset.values.optInt(GlassRenderer.KEY_CORNER,
                 GlassRenderer.DEFAULT_CORNER);
         float radius = Math.min(dp(corner), Math.min(card.width(), card.height()) / 2f);
@@ -131,7 +182,6 @@ public class WidgetPresetPreviewView extends View {
         clip.addRoundRect(card, radius, radius, Path.Direction.CW);
         canvas.save();
         canvas.clipPath(clip);
-
         boolean dark = drawBackground(canvas);
         canvas.restore();
 
@@ -139,12 +189,17 @@ public class WidgetPresetPreviewView extends View {
         borderPaint.setColor(dark ? 0x33FFFFFF : 0x22000000);
         canvas.drawPath(clip, borderPaint);
 
-        boolean customLayout = preset.values.optBoolean("customLayout", false);
+        boolean customLayout = WidgetPresetStore.usesCustomLayout(preset.values);
         if (customLayout && scene != null) {
             drawCustomText(canvas, dark);
             drawSceneImages(canvas);
-        } else {
+            drawHint(canvas, dark);
+        } else if (cellsWide >= 4) {
+            // 4×2 常规版：正文 + 右侧配图 + 完整作者行
             drawDefaultWidget(canvas, dark);
+        } else {
+            // 2×2 紧凑版：无配图、正文满宽、作者行一行
+            drawCompactWidget(canvas, dark);
         }
     }
 
@@ -181,9 +236,11 @@ public class WidgetPresetPreviewView extends View {
                 == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         boolean dark = GlassRenderer.TONE_DARK.equals(tone)
                 || (!GlassRenderer.TONE_LIGHT.equals(tone) && night);
+        // 和桌面一致：没开玻璃、也没开自定义背景时用主题纸张底色
+        int paper = preset.values.optInt("backgroundColor", 0);
+        if (paper == 0) paper = dark ? 0xFF211F24 : 0xFFFDF8F3;
         backgroundPaint.setShader(null);
-        backgroundPaint.setColor(glass ? (dark ? 0xE6211F26 : 0xE6F7F8FC)
-                : (dark ? 0xFF211F24 : 0xFFFFFFFF));
+        backgroundPaint.setColor(glass ? (dark ? 0xE6211F26 : 0xE6F7F8FC) : paper);
         canvas.drawRect(card, backgroundPaint);
         if (glass) {
             backgroundPaint.setShader(new LinearGradient(card.left, card.top,
@@ -195,25 +252,53 @@ public class WidgetPresetPreviewView extends View {
         return dark;
     }
 
-    /** 默认布局：正文 + 右侧配图 + 作者行。 */
+    /** 2×2 紧凑版：与 widget_quote_compact.xml 一致，无配图、作者行一行。 */
+    private void drawCompactWidget(Canvas canvas, boolean dark) {
+        String text = text();
+        String meta = compactMeta();
+        float pad = dp(10);
+        float width = Math.max(dp(40), card.width() - pad * 2);
+        float metaHeight = dp(14);
+
+        textPaint.setColor(dark ? 0xFFFDFCFF : 0xFF121016);
+        textPaint.setTextSize(fontPx());
+        Layout body = StaticLayout.Builder.obtain(text, 0, text.length(), textPaint,
+                        (int) width)
+                .setMaxLines(6)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .setIncludePad(false)
+                .build();
+        canvas.save();
+        canvas.translate(card.left + pad, card.top + pad);
+        canvas.clipRect(0, 0, width,
+                Math.max(1, card.height() - pad * 2 - metaHeight));
+        body.draw(canvas);
+        canvas.restore();
+
+        metaPaint.setColor(ThemeColors.ensureReadable(themeColor(), dark));
+        metaPaint.setTextSize(sp(9));
+        canvas.drawText(meta, card.left + pad, card.bottom - pad, metaPaint);
+    }
+
+    /** 4×2 常规版：与 widget_quote.xml 一致，正文 + 右侧配图 + 完整作者行。 */
     private void drawDefaultWidget(Canvas canvas, boolean dark) {
-        String text = preset.values.optString("lastQuoteText", SAMPLE);
-        String meta = preset.values.optString("lastQuoteMeta", SAMPLE_META);
-        if (text.isEmpty()) text = SAMPLE;
-        if (meta.isEmpty()) meta = SAMPLE_META;
+        String text = text();
+        String meta = fullMeta();
         float pad = dp(14);
+        float imageW = dp(72);
+        float gap = dp(8);
         boolean hasImage = quoteImage != null && !quoteImage.isRecycled();
-        float imageW = hasImage ? card.width() * 0.28f : 0;
-        float textWidth = Math.max(dp(40), card.width() - pad * 2 - imageW
-                - (hasImage ? dp(8) : 0));
+        float textWidth = Math.max(dp(40), card.width() - pad * 2
+                - (hasImage ? imageW + gap : 0));
         float textBottom = card.bottom - pad - dp(18);
 
         textPaint.setColor(dark ? 0xFFFDFCFF : 0xFF121016);
         textPaint.setTextSize(fontPx());
         Layout body = StaticLayout.Builder.obtain(text, 0, text.length(), textPaint,
                         (int) textWidth)
-                .setMaxLines(5)
+                .setMaxLines(8)
                 .setEllipsize(TextUtils.TruncateAt.END)
+                .setIncludePad(false)
                 .build();
         canvas.save();
         canvas.translate(card.left + pad, card.top + pad);
@@ -221,9 +306,18 @@ public class WidgetPresetPreviewView extends View {
         body.draw(canvas);
         canvas.restore();
 
+        // 作者行最多两行，和桌面 widget_quote.xml 一致
         metaPaint.setColor(ThemeColors.ensureReadable(themeColor(), dark));
-        metaPaint.setTextSize(10 * getResources().getDisplayMetrics().scaledDensity);
-        canvas.drawText(meta, card.left + pad, card.bottom - pad, metaPaint);
+        metaPaint.setTextSize(sp(10));
+        Layout metaLayout = StaticLayout.Builder.obtain(meta, 0, meta.length(), metaPaint,
+                        (int) textWidth)
+                .setMaxLines(2)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .build();
+        canvas.save();
+        canvas.translate(card.left + pad, card.bottom - pad - metaLayout.getHeight());
+        metaLayout.draw(canvas);
+        canvas.restore();
 
         if (hasImage) {
             RectF target = new RectF(card.right - pad - imageW, card.top + pad,
@@ -239,10 +333,8 @@ public class WidgetPresetPreviewView extends View {
 
     /** 自定义布局：按场景 0–1 坐标还原文字框，再按顺序叠图片。 */
     private void drawCustomText(Canvas canvas, boolean dark) {
-        String text = preset.values.optString("lastQuoteText", SAMPLE);
-        String meta = preset.values.optString("lastQuoteMeta", SAMPLE_META);
-        if (text.isEmpty()) text = SAMPLE;
-        if (meta.isEmpty()) meta = SAMPLE_META;
+        String text = text();
+        String meta = fullMeta();
         CustomScene.Box box = scene.text;
         RectF rect = boxRect(box);
         float rotation = CustomScene.normalizeRotation(box.rotation);
@@ -263,6 +355,7 @@ public class WidgetPresetPreviewView extends View {
                         (int) width)
                 .setMaxLines(5)
                 .setEllipsize(TextUtils.TruncateAt.END)
+                .setIncludePad(false)
                 .build();
         canvas.save();
         canvas.clipRect(rect);
@@ -271,13 +364,14 @@ public class WidgetPresetPreviewView extends View {
         canvas.restore();
 
         metaPaint.setColor(ThemeColors.ensureReadable(themeColor(), dark));
-        metaPaint.setTextSize(10 * getResources().getDisplayMetrics().scaledDensity);
+        metaPaint.setTextSize(sp(10));
         canvas.drawText(meta, rect.left + pad, rect.bottom - pad, metaPaint);
         canvas.restore();
     }
 
     private void drawSceneImages(Canvas canvas) {
-        for (int i = 0; i < Math.min(4, scene.images.size()); i++) {
+        for (int i = 0; i < Math.min(QuoteWidgetProvider.MAX_IMAGE_SLOTS,
+                scene.images.size()); i++) {
             Bitmap bitmap = sceneImages[i];
             if (bitmap == null || bitmap.isRecycled()) continue;
             CustomScene.ImageBox box = scene.images.get(i);
@@ -287,25 +381,50 @@ public class WidgetPresetPreviewView extends View {
                     rect.centerX(), rect.centerY());
             canvas.scale(box.flipH ? -1f : 1f, box.flipV ? -1f : 1f,
                     rect.centerX(), rect.centerY());
-            Path imageClip = new Path();
-            imageClip.addRoundRect(rect, dp(10), dp(10), Path.Direction.CW);
-            canvas.clipPath(imageClip);
             drawFitCenter(canvas, bitmap, rect);
             canvas.restore();
         }
     }
 
-    private RectF boxRect(CustomScene.Box box) {
-        return new RectF(
-                card.left + box.x * card.width(),
-                card.top + box.y * card.height(),
-                card.left + (box.x + box.w) * card.width(),
-                card.top + (box.y + box.h) * card.height());
+    /** 「点按换一句」只在 4×2 且高度够时才出现（与桌面判断一致）。 */
+    private void drawHint(Canvas canvas, boolean dark) {
+        if (card.height() < dp(140)) return;
+        Paint hint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        hint.setColor(dark ? 0x66FDFCFF : 0x776F80);
+        hint.setTextSize(sp(8));
+        hint.setTextAlign(Paint.Align.RIGHT);
+        canvas.drawText("点按换一句", card.right - dp(10), card.bottom - dp(6), hint);
+    }
+
+    // ---- 工具 ----
+
+    private String text() {
+        String text = preset.values.optString("snapshotText", "").trim();
+        if (text.isEmpty()) text = SAMPLE;
+        return text;
+    }
+
+    /** 2×2 和桌面一样只保留作者与作品。 */
+    private String compactMeta() {
+        String meta = preset.values.optString("snapshotMeta", "").trim();
+        if (meta.isEmpty()) return SAMPLE_META;
+        // 形如「— 作者 · 《作品》 · 类型 · 分类」，去掉后两段
+        String[] parts = meta.split(" · ");
+        if (parts.length <= 2) return meta;
+        return parts[0] + " · " + parts[1];
+    }
+
+    private String fullMeta() {
+        String meta = preset.values.optString("snapshotMeta", "").trim();
+        return meta.isEmpty() ? SAMPLE_META : meta;
     }
 
     private float fontPx() {
-        float scaled = getResources().getDisplayMetrics().scaledDensity;
-        return Math.max(10 * scaled, preset.values.optInt("fontSize", 16) * scaled);
+        return sp(preset.values.optInt("fontSize", 16));
+    }
+
+    private float sp(float value) {
+        return value * getResources().getDisplayMetrics().scaledDensity;
     }
 
     private int themeColor() {
@@ -313,6 +432,18 @@ public class WidgetPresetPreviewView extends View {
             return ThemeColors.systemAccent(getContext());
         }
         return preset.values.optInt(ThemeColors.KEY, ThemeColors.DEFAULT_COLOR);
+    }
+
+    private void drawFitCenter(Canvas canvas, Bitmap bitmap, RectF target) {
+        float scale = Math.min(target.width() / bitmap.getWidth(),
+                target.height() / bitmap.getHeight());
+        float w = bitmap.getWidth() * scale;
+        float h = bitmap.getHeight() * scale;
+        float left = target.left + (target.width() - w) / 2f;
+        float top = target.top + (target.height() - h) / 2f;
+        backgroundPaint.setShader(null);
+        canvas.drawBitmap(bitmap, null,
+                new RectF(left, top, left + w, top + h), backgroundPaint);
     }
 
     private void drawCenterCrop(Canvas canvas, Bitmap bitmap, RectF target) {
@@ -327,17 +458,12 @@ public class WidgetPresetPreviewView extends View {
                 new RectF(left, top, left + w, top + h), backgroundPaint);
     }
 
-    /** 配图 / 自定义图片框完整显示，不裁掉图像边缘。 */
-    private void drawFitCenter(Canvas canvas, Bitmap bitmap, RectF target) {
-        float scale = Math.min(target.width() / bitmap.getWidth(),
-                target.height() / bitmap.getHeight());
-        float w = bitmap.getWidth() * scale;
-        float h = bitmap.getHeight() * scale;
-        float left = target.left + (target.width() - w) / 2f;
-        float top = target.top + (target.height() - h) / 2f;
-        backgroundPaint.setShader(null);
-        canvas.drawBitmap(bitmap, null,
-                new RectF(left, top, left + w, top + h), backgroundPaint);
+    private RectF boxRect(CustomScene.Box box) {
+        return new RectF(
+                card.left + box.x * card.width(),
+                card.top + box.y * card.height(),
+                card.left + (box.x + box.w) * card.width(),
+                card.top + (box.y + box.h) * card.height());
     }
 
     private Shader gradient(RectF rect, int start, int end, int angle) {

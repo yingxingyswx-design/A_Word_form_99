@@ -13,6 +13,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
+
+import org.json.JSONObject;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -539,8 +541,45 @@ public class SettingsActivity extends ThemedActivity {
     private void showWidgetPresetPreview(WidgetPresetStore.Preset preset) {
         View content = getLayoutInflater().inflate(R.layout.dialog_widget_preview, null);
         WidgetPresetPreviewView preview = content.findViewById(R.id.preset_preview_view);
-        preview.setPreset(preset);
+        TextView hint = content.findViewById(R.id.preset_preview_hint);
+        // 预览里的句子 / 配图取预设生成时的快照；旧预设没有快照就用当前显示的那句
+        WidgetPresetStore.Preset view = preset;
+        if (preset.values.isNull("snapshotText")) {
+            JSONObject values = new JSONObject();
+            java.util.Iterator<String> keys = preset.values.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                try {
+                    values.put(key, preset.values.get(key));
+                } catch (org.json.JSONException ignored) {
+                }
+            }
+            try {
+                values.put("snapshotText", prefs.getString("lastQuoteText",
+                        "知者不惑，仁者不忧，勇者不惧。"));
+                values.put("snapshotMeta", prefs.getString("lastQuoteMeta",
+                        "— 孔子 · 《论语》 · 原文"));
+                values.put("snapshotImage", prefs.getString("lastQuoteImage", ""));
+            } catch (org.json.JSONException ignored) {
+            }
+            view = new WidgetPresetStore.Preset(preset.id, preset.name, preset.createdAt, values);
+        }
+        preview.setPreset(view);
         ((TextView) content.findViewById(R.id.preset_preview_summary)).setText(preset.summary());
+        preview.setPreviewCells(2);
+        hint.setText("预览按 2×2 卡片绘制；自定义布局的精确位置以桌面实际效果为准。");
+
+        com.google.android.material.button.MaterialButtonToggleGroup group =
+                content.findViewById(R.id.preview_size_group);
+        group.addOnButtonCheckedListener((g, checkedId, isChecked) -> {
+            if (!isChecked) return;
+            boolean wide = checkedId == R.id.preview_size_4x2;
+            preview.setPreviewCells(wide ? 4 : 2);
+            hint.setText(wide
+                    ? "预览按 4×2 卡片绘制（宽高 2:1）；自定义布局的位置按场景分数线性拉伸。"
+                    : "预览按 2×2 卡片绘制；自定义布局的精确位置以桌面实际效果为准。");
+        });
+
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("小组件视图 · " + preset.name)
                 .setView(content)
