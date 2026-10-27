@@ -341,6 +341,24 @@ final class ImageStore {
         }
     }
 
+    /**
+     * 只读图片原始宽高，不解码像素；找不到文件返回 null。
+     * 自定义布局用它让图片框一开始就是图片本身的宽高比，避免 fitCenter 出现空边。
+     */
+    static int[] aspect(Context context, String name) {
+        File file = resolve(context, name);
+        if (file == null || !file.isFile()) return null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(file.getPath(), bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            return new int[]{bounds.outWidth, bounds.outHeight};
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** 解码并应用水平 / 垂直镜像。旋转现在由画布和小组件视图各自完成，不再烘焙进位图。 */
     static Bitmap decodeFlipped(Context context, String name, int maxPx,
                                 boolean flipH, boolean flipV) {

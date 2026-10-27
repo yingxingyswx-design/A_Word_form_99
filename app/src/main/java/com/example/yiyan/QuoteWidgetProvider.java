@@ -444,6 +444,28 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             int top = clampPx(box.y * contentHeight, 0, contentHeight - 1);
             int width = clampPx(box.w * contentWidth, Math.round(24 * density), contentWidth - left);
             int height = clampPx(box.h * contentHeight, Math.round(24 * density), contentHeight - top);
+            // 图片框按图片本身比例收窄 / 压扁：fitCenter 下不会出现上下或左右空边。
+            // 桌面端 RemoteViews 改不了框尺寸，所以这里直接换算 padding。
+            List<String> frames = ImageStore.frameNames(context, box.name);
+            String aspectSource = frames.isEmpty() ? box.name : frames.get(0);
+            int[] intrinsic = ImageStore.aspect(context, aspectSource);
+            if (intrinsic != null && intrinsic[0] > 0 && intrinsic[1] > 0
+                    && width > 0 && height > 0) {
+                float aspect = (float) intrinsic[0] / intrinsic[1];
+                float current = (float) width / height;
+                if (Math.abs(current - aspect) / aspect > 0.02f) {
+                    float fitW = (float) Math.sqrt((double) width * height * aspect);
+                    float fitH = (float) Math.sqrt((double) width * height / aspect);
+                    int newW = clampInt(Math.round(fitW), Math.round(12 * density), contentWidth);
+                    int newH = clampInt(Math.round(fitH), Math.round(12 * density), contentHeight);
+                    if (Math.abs(((float) newW / newH) - aspect) / aspect > 0.02f) {
+                        newW = Math.max(1, Math.round(newH * aspect));
+                        newH = Math.max(1, Math.round(newW / aspect));
+                    }
+                    width = clampInt(newW, Math.round(12 * density), contentWidth - left);
+                    height = clampInt(newH, Math.round(12 * density), contentHeight - top);
+                }
+            }
             views.setViewVisibility(SLOT_WRAP[i], View.VISIBLE);
             views.setViewPadding(SLOT_WRAP[i], left, top,
                     Math.max(0, contentWidth - left - width),
@@ -453,7 +475,6 @@ public class QuoteWidgetProvider extends AppWidgetProvider {
             views.setFloat(SLOT_IMAGE[i], "setRotation", rotation);
             views.setFloat(SLOT_FLIPPER[i], "setRotation", rotation);
 
-            List<String> frames = ImageStore.frameNames(context, box.name);
             if (frames.size() > 1) {
                 Bitmap first = ImageStore.decodeFlipped(context, frames.get(0),
                         ImageStore.WIDGET_MAX_PX, box.flipH, box.flipV);

@@ -120,8 +120,18 @@ public class LayoutEditorActivity extends ThemedActivity {
             }
         }
 
-        CustomScene.ImageBox box = new CustomScene.ImageBox(0f, 0f, 0.22f,
-                Math.min(0.9f, 0.22f * scene.widthDp / Math.max(1, scene.heightDp)));
+        // 新图片框的宽高比跟随图片本身：fitCenter 下不会出现上下 / 左右空边
+        int[] size = ImageStore.aspect(this, firstFrameName(name));
+        float imageAspect = size == null ? 1f : (float) size[0] / Math.max(1, size[1]);
+        float boxWidth = 0.22f;
+        float boxHeight = boxWidth * (scene.widthDp / Math.max(1, scene.heightDp)) / imageAspect;
+        if (boxHeight > 0.9f) {
+            boxHeight = 0.9f;
+            boxWidth = Math.min(0.9f, boxHeight * imageAspect * (scene.heightDp
+                    / (float) Math.max(1, scene.widthDp)));
+        }
+        CustomScene.ImageBox box = new CustomScene.ImageBox(0f, 0f,
+                Math.max(0.08f, boxWidth), Math.max(0.08f, boxHeight));
         // 依次错开叠放，允许压住文字或别的图片
         int count = scene.images.size();
         box.x = Math.max(0f, Math.min(1f - box.w, 0.55f + count * 0.04f));

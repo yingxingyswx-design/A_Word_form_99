@@ -127,7 +127,33 @@ public class LayoutCanvasView extends View {
     void setBitmap(int index, Bitmap bitmap) {
         if (index < 0 || index >= bitmaps.length) return;
         bitmaps[index] = bitmap;
+        // 首次拿到图片尺寸时，把明显不是图片比例的框收成图片比例，
+        // 否则 fitCenter 会在框里留出上下 / 左右空边（旧版默认的方形框最常见）。
+        if (bitmap != null && index < scene.images.size()) {
+            fitBoxToImage(scene.images.get(index), bitmap);
+        }
         invalidate();
+    }
+
+    private void fitBoxToImage(CustomScene.ImageBox box, Bitmap bitmap) {
+        if (bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) return;
+        if (box.w <= 0f || box.h <= 0f) return;
+        float aspect = (float) bitmap.getWidth() / bitmap.getHeight();
+
+        // 先算框在内容区的实际像素尺寸（与 drawImage 使用的矩形一致）
+        float pixelW = box.w * contentRect.width();
+        float pixelH = box.h * contentRect.height();
+        if (pixelW <= 1f || pixelH <= 1f) return;
+
+        float tolerance = 0.06f;
+        if (Math.abs((pixelW / pixelH) - aspect) / aspect <= tolerance) return;
+
+        // 保持面积不变地调整框，避免把图片突然放大或缩小
+        float newPixelW = (float) Math.sqrt(pixelW * pixelH * aspect);
+        float newPixelH = (float) Math.sqrt(pixelW * pixelH / aspect);
+        box.w = clampSize(newPixelW / Math.max(1f, contentRect.width()));
+        box.h = clampSize(newPixelH / Math.max(1f, contentRect.height()));
+        clampInside(box);
     }
 
     void setListener(Listener listener) {
